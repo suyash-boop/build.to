@@ -146,6 +146,11 @@ model Post {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
+  // Weighted full-text search vector (PRD §5.9). A generated column maintained
+  // by Postgres — see the add_search_vector migration. Prisma has no tsvector
+  // type, so it is Unsupported and queried via raw SQL in lib/search.ts.
+  searchVector Unsupported("tsvector")?
+
   tags     PostTag[]
   comments Comment[]
 

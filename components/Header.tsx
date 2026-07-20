@@ -14,9 +14,20 @@ export async function Header() {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-body-bg">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-        <Link href="/" className="text-l font-bold text-body">
-          build.to
-        </Link>
+        <div className="flex flex-1 items-center gap-4">
+          <Link href="/" className="text-l font-bold text-body">
+            build.to
+          </Link>
+          <form action="/search" className="hidden max-w-xs flex-1 sm:block">
+            <input
+              type="search"
+              name="q"
+              placeholder="Search"
+              aria-label="Search posts"
+              className="w-full rounded border border-border bg-body-bg px-3 py-1.5 text-s text-body placeholder:text-secondary focus-visible:outline-2 focus-visible:outline-brand"
+            />
+          </form>
+        </div>
 
         <nav className="flex items-center gap-3">
           {user ? (
