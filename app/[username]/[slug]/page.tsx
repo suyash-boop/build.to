@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { Avatar, Card, Tag } from "@/components/ui";
+import { ProcessingState } from "@/components/post/ProcessingState";
 import type { Metadata } from "next";
 
 interface PageProps {
@@ -120,11 +121,15 @@ export default async function PostPage({ params }: PageProps) {
             </div>
           )}
 
-          <div
-            className="post-body mt-8"
-            // Safe: processedHtml came from lib/markdown.ts, which runs rehypeSanitize.
-            dangerouslySetInnerHTML={{ __html: post.processedHtml ?? "" }}
-          />
+          {post.processingState === "READY" && post.processedHtml ? (
+            <div
+              className="post-body mt-8"
+              // Safe: processedHtml came from lib/markdown.ts, which runs rehypeSanitize.
+              dangerouslySetInnerHTML={{ __html: post.processedHtml }}
+            />
+          ) : (
+            <ProcessingState failed={post.processingState === "FAILED"} />
+          )}
         </div>
       </Card>
     </main>

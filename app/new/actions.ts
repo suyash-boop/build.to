@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { parseDocument, type ParsedDocument } from "@/lib/frontmatter";
 import { excerpt, readingTime, renderMarkdown } from "@/lib/markdown";
+import { enqueueProcessMarkdown } from "@/lib/queues";
 import { generateSlug } from "@/lib/slug";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
@@ -86,12 +87,20 @@ async function syncTags(
   }
 }
 
-function derivedFields(document: ParsedDocument, html: string) {
+/**
+ * Fields written on the request path. Rendering is NOT done here — the post is
+ * saved PENDING and a `process-markdown` job renders it (PRD §6.5), so publish
+ * returns immediately instead of blocking on the pipeline.
+ *
+ * description and readingTime are cheap string operations, so they are computed
+ * inline to keep feed cards correct the instant a post is saved; the worker
+ * recomputes them from the same source anyway.
+ */
+function derivedFields(document: ParsedDocument) {
   return {
     title: document.title,
     bodyMarkdown: document.bodyMarkdown,
-    processedHtml: html,
-    processingState: "READY" as const,
+    processingState: "PENDING" as const,
     coverImage: document.coverImage,
     description: excerpt(document.bodyMarkdown),
     readingTime: readingTime(document.bodyMarkdown),
@@ -125,13 +134,12 @@ export async function createPost(
   // publish it, which is the opposite of what the click asked for.
   const shouldPublish =
     intent === "publish" ? true : intent === "draft" ? false : document.published;
-  const html = await renderMarkdown(document.bodyMarkdown);
   const slug = generateSlug(document.title);
 
   const created = await prisma.$transaction(async (tx) => {
     const post = await tx.post.create({
       data: {
-        ...derivedFields(document, html),
+        ...derivedFields(document),
         userId: session.user.id,
         slug,
         published: shouldPublish,
@@ -149,6 +157,10 @@ export async function createPost(
     }
     return post;
   });
+
+  // Enqueue after the transaction commits — a job enqueued inside it could be
+  // picked up before the row is visible to the worker's connection.
+  await enqueueProcessMarkdown(created.id);
 
   // A draft goes back to the editor (where you keep working on it); a published
   // post goes to its public page.
@@ -188,7 +200,6 @@ export async function updatePost(
   const shouldPublish =
     intent === "autosave" ? existing.published : intent === "publish";
 
-  const html = await renderMarkdown(document.bodyMarkdown);
   const slug = existing.published
     ? existing.slug
     : generateSlug(document.title);
@@ -197,7 +208,7 @@ export async function updatePost(
     await tx.post.update({
       where: { id: postId },
       data: {
-        ...derivedFields(document, html),
+        ...derivedFields(document),
         slug,
         published: shouldPublish,
         publishedAt:
@@ -217,6 +228,8 @@ export async function updatePost(
       });
     }
   });
+
+  await enqueueProcessMarkdown(postId);
 
   if (intent === "autosave") return null;
   redirect(
@@ -250,13 +263,12 @@ export async function createDraft(
   const { document, errors } = parseDocument(source);
   if (!document) return { errors };
 
-  const html = await renderMarkdown(document.bodyMarkdown);
   const slug = generateSlug(document.title);
 
   const post = await prisma.$transaction(async (tx) => {
     const created = await tx.post.create({
       data: {
-        ...derivedFields(document, html),
+        ...derivedFields(document),
         userId: session.user.id,
         slug,
         published: false,
@@ -266,6 +278,8 @@ export async function createDraft(
     await syncTags(tx, created.id, document.tags, false, false);
     return created;
   });
+
+  await enqueueProcessMarkdown(post.id);
 
   return { id: post.id };
 }
