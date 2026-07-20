@@ -31,9 +31,11 @@ export interface ParseResult {
   errors: string[];
 }
 
+// `published` is intentionally absent: the Save draft / Publish buttons control
+// publish state, so a frontmatter field that looks like it does the same thing
+// is a trap. It is still parsed for round-tripping existing documents.
 export const EDITOR_TEMPLATE = `---
 title:
-published: false
 tags:
 cover_image:
 ---

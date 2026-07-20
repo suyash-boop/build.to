@@ -4,7 +4,6 @@
  */
 export interface PostDocumentFields {
   title: string;
-  published: boolean;
   coverImage: string | null;
   bodyMarkdown: string;
   tags: string[];
@@ -26,7 +25,7 @@ export function toEditorSource(post: PostDocumentFields): string {
   return [
     "---",
     `title: ${yamlScalar(post.title)}`,
-    `published: ${post.published}`,
+    // `published` is deliberately omitted — the buttons own publish state.
     `tags: ${post.tags.join(", ")}`,
     `cover_image: ${yamlScalar(post.coverImage ?? "")}`,
     "---",

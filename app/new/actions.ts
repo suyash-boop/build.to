@@ -119,11 +119,16 @@ export async function createPost(
   const { document, errors } = parseDocument(source);
   if (!document) return { errors };
 
-  const shouldPublish = intent === "publish" || document.published;
+  // The button the author clicked is authoritative. `published:` in the
+  // frontmatter is only the default for when no explicit intent was given —
+  // otherwise "Save draft" on a document saying `published: true` would
+  // publish it, which is the opposite of what the click asked for.
+  const shouldPublish =
+    intent === "publish" ? true : intent === "draft" ? false : document.published;
   const html = await renderMarkdown(document.bodyMarkdown);
   const slug = generateSlug(document.title);
 
-  await prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx) => {
     const post = await tx.post.create({
       data: {
         ...derivedFields(document, html),
@@ -142,9 +147,16 @@ export async function createPost(
         data: { postsCount: { increment: 1 } },
       });
     }
+    return post;
   });
 
-  redirect(`/${session.user.username}/${slug}`);
+  // A draft goes back to the editor (where you keep working on it); a published
+  // post goes to its public page.
+  redirect(
+    shouldPublish
+      ? `/${session.user.username}/${slug}`
+      : `/edit/${created.id}?saved=1`,
+  );
 }
 
 /**
@@ -171,11 +183,10 @@ export async function updatePost(
   const { document, errors } = parseDocument(source);
   if (!document) return { errors };
 
-  // Autosave never changes publish state; it only persists content.
+  // Autosave never changes publish state; it only persists content. Otherwise
+  // the clicked button wins over the frontmatter's `published:` field.
   const shouldPublish =
-    intent === "autosave"
-      ? existing.published
-      : intent === "publish" || document.published;
+    intent === "autosave" ? existing.published : intent === "publish";
 
   const html = await renderMarkdown(document.bodyMarkdown);
   const slug = existing.published
@@ -208,7 +219,11 @@ export async function updatePost(
   });
 
   if (intent === "autosave") return null;
-  redirect(`/${session.user.username}/${slug}`);
+  redirect(
+    shouldPublish
+      ? `/${session.user.username}/${slug}`
+      : `/edit/${postId}?saved=1`,
+  );
 }
 
 /** Autosave wrapper — persists without navigating. Returns a save timestamp. */
