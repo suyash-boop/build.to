@@ -6,7 +6,7 @@ import type { NextRequest } from "next/server";
 // an OPTIMISTIC check only — it just looks for a session cookie and does no DB
 // work. The real "does this user have a username / own this resource?" checks
 // live in the page/layout server components.
-const PROTECTED_PREFIXES = ["/new", "/settings"];
+const PROTECTED_PREFIXES = ["/new", "/settings", "/drafts", "/edit"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -26,5 +26,10 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/new/:path*", "/settings/:path*"],
+  matcher: [
+    "/new/:path*",
+    "/settings/:path*",
+    "/drafts/:path*",
+    "/edit/:path*",
+  ],
 };

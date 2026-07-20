@@ -16,6 +16,8 @@ export const RESERVED_USERNAMES = new Set([
   // Also reserve routes we use even though they aren't in the PRD list:
   "onboarding",
   "notifications",
+  "drafts",
+  "edit",
 ]);
 
 // PRD §5.1: ^[a-z0-9_]{3,20}$

@@ -1,22 +1,55 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { createPost, previewMarkdown, type SaveState } from "./actions";
+import {
+  autosavePost,
+  createDraft,
+  createPost,
+  previewMarkdown,
+  updatePost,
+  type SaveState,
+} from "./actions";
 import { EDITOR_TEMPLATE } from "@/lib/frontmatter";
 import { Button, Card, Tabs } from "@/components/ui";
 
-export function Editor() {
-  const [source, setSource] = useState(EDITOR_TEMPLATE);
+const AUTOSAVE_INTERVAL_MS = 30_000; // PRD §5.2
+
+export interface EditorProps {
+  /** Existing post id when editing; omitted for a new post. */
+  postId?: string;
+  /** Existing document source when editing. */
+  initialSource?: string;
+}
+
+export function Editor({ postId, initialSource }: EditorProps) {
+  const [source, setSource] = useState(initialSource ?? EDITOR_TEMPLATE);
   const [tab, setTab] = useState("edit");
   const [preview, setPreview] = useState("");
   // True while a debounced preview render is pending; set by the events that
   // invalidate the preview (typing, switching to the tab), not by the effect.
   const [previewing, setPreviewing] = useState(true);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [autosaving, setAutosaving] = useState(false);
+
   const [state, formAction, pending] = useActionState<SaveState, FormData>(
     createPost,
     null,
   );
-  const formRef = useRef<HTMLFormElement>(null);
+
+  // The row autosave writes to: the existing post, or a draft created on the
+  // first autosave of a new post. State (not just a ref) because the submit
+  // buttons must switch from "create" to "update" once a draft exists — a ref
+  // alone would leave them stale and publish a duplicate post.
+  const [draftId, setDraftId] = useState<string | null>(postId ?? null);
+  const draftIdRef = useRef<string | null>(postId ?? null);
+  // Content as of the last successful save, so we skip no-op autosaves.
+  const lastSavedSourceRef = useRef(initialSource ?? "");
+  // Mirrors `source` so the autosave interval and submit handlers read the
+  // latest content without needing to re-subscribe on every keystroke.
+  const sourceRef = useRef(source);
+  useEffect(() => {
+    sourceRef.current = source;
+  }, [source]);
 
   // Preview runs the same pipeline as publish, debounced 500ms (PRD §5.2).
   useEffect(() => {
@@ -34,21 +67,74 @@ export function Editor() {
     };
   }, [tab, source]);
 
+  // Autosave every 30s if the content changed (PRD §5.2).
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      const current = sourceRef.current;
+      if (current === lastSavedSourceRef.current) return; // nothing changed
+
+      setAutosaving(true);
+      try {
+        if (draftIdRef.current) {
+          const result = await autosavePost(draftIdRef.current, current);
+          if ("savedAt" in result) {
+            lastSavedSourceRef.current = current;
+            setSavedAt(new Date(result.savedAt));
+          }
+        } else {
+          // First autosave of a new post: create the draft row to write into.
+          const result = await createDraft(current);
+          if ("id" in result) {
+            draftIdRef.current = result.id;
+            setDraftId(result.id); // flips the buttons to "update" mode
+            lastSavedSourceRef.current = current;
+            setSavedAt(new Date());
+          }
+        }
+      } finally {
+        setAutosaving(false);
+      }
+    }, AUTOSAVE_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Once a draft exists, submits must update it rather than create a duplicate.
+  async function handleSubmit(intent: "draft" | "publish") {
+    const id = draftIdRef.current;
+    if (!id) return; // no draft yet — the plain form action handles creation
+    await updatePost(id, sourceRef.current, intent);
+  }
+
+  const isEditing = draftId !== null;
+
   return (
-    <form ref={formRef} action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="source" value={source} />
 
-      <Tabs
-        tabs={[
-          { value: "edit", label: "Edit" },
-          { value: "preview", label: "Preview" },
-        ]}
-        value={tab}
-        onValueChange={(next) => {
-          if (next === "preview") setPreviewing(true);
-          setTab(next);
-        }}
-      />
+      <div className="flex items-end justify-between gap-4">
+        <Tabs
+          tabs={[
+            { value: "edit", label: "Edit" },
+            { value: "preview", label: "Preview" },
+          ]}
+          value={tab}
+          onValueChange={(next) => {
+            if (next === "preview") setPreviewing(true);
+            setTab(next);
+          }}
+          className="flex-1"
+        />
+        <p className="pb-2 text-s text-secondary" aria-live="polite">
+          {autosaving
+            ? "Saving…"
+            : savedAt
+              ? `Saved ${savedAt.toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}`
+              : ""}
+        </p>
+      </div>
 
       {state?.errors?.length ? (
         <div
@@ -75,7 +161,7 @@ export function Editor() {
           aria-label="Post markdown"
         />
       ) : (
-        <Card className="min-h-[60vh] p-6">
+        <Card className="min-h-40 p-6">
           {previewing ? (
             <p className="text-secondary">Rendering…</p>
           ) : (
@@ -90,15 +176,22 @@ export function Editor() {
 
       <div className="flex items-center justify-end gap-3">
         <Button
-          type="submit"
+          type={isEditing ? "button" : "submit"}
           variant="outline"
           name="intent"
           value="draft"
           disabled={pending}
+          onClick={isEditing ? () => handleSubmit("draft") : undefined}
         >
           Save draft
         </Button>
-        <Button type="submit" name="intent" value="publish" disabled={pending}>
+        <Button
+          type={isEditing ? "button" : "submit"}
+          name="intent"
+          value="publish"
+          disabled={pending}
+          onClick={isEditing ? () => handleSubmit("publish") : undefined}
+        >
           {pending ? "Publishing…" : "Publish"}
         </Button>
       </div>

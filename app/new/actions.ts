@@ -2,10 +2,11 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
-import { parseDocument } from "@/lib/frontmatter";
+import { parseDocument, type ParsedDocument } from "@/lib/frontmatter";
 import { excerpt, readingTime, renderMarkdown } from "@/lib/markdown";
 import { generateSlug } from "@/lib/slug";
 import { redirect } from "next/navigation";
+import type { Prisma } from "@prisma/client";
 
 export type SaveState = { errors: string[] } | null;
 
@@ -22,6 +23,79 @@ const TAG_COLORS = [
 
 function randomTagColor() {
   return TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
+}
+
+/**
+ * Replace a post's tag set, keeping Tag.postsCount consistent.
+ *
+ * `countsApply` is whether this post currently contributes to tag counts (i.e.
+ * it is published) — an unpublished draft's tags must not inflate the counts.
+ */
+async function syncTags(
+  tx: Prisma.TransactionClient,
+  postId: string,
+  tagNames: string[],
+  wasCounted: boolean,
+  isCounted: boolean,
+) {
+  const existing = await tx.postTag.findMany({
+    where: { postId },
+    include: { tag: true },
+  });
+  const existingNames = existing.map((pt) => pt.tag.name);
+
+  const removed = existing.filter((pt) => !tagNames.includes(pt.tag.name));
+  const added = tagNames.filter((n) => !existingNames.includes(n));
+  const kept = existing.filter((pt) => tagNames.includes(pt.tag.name));
+
+  for (const pt of removed) {
+    await tx.postTag.delete({
+      where: { postId_tagId: { postId, tagId: pt.tagId } },
+    });
+    if (wasCounted) {
+      await tx.tag.update({
+        where: { id: pt.tagId },
+        data: { postsCount: { decrement: 1 } },
+      });
+    }
+  }
+
+  for (const name of added) {
+    const tag = await tx.tag.upsert({
+      where: { name },
+      create: { name, bgColorHex: randomTagColor() },
+      update: {},
+    });
+    await tx.postTag.create({ data: { postId, tagId: tag.id } });
+    if (isCounted) {
+      await tx.tag.update({
+        where: { id: tag.id },
+        data: { postsCount: { increment: 1 } },
+      });
+    }
+  }
+
+  // Tags that stayed while the post's published state flipped.
+  if (wasCounted !== isCounted) {
+    for (const pt of kept) {
+      await tx.tag.update({
+        where: { id: pt.tagId },
+        data: { postsCount: isCounted ? { increment: 1 } : { decrement: 1 } },
+      });
+    }
+  }
+}
+
+function derivedFields(document: ParsedDocument, html: string) {
+  return {
+    title: document.title,
+    bodyMarkdown: document.bodyMarkdown,
+    processedHtml: html,
+    processingState: "READY" as const,
+    coverImage: document.coverImage,
+    description: excerpt(document.bodyMarkdown),
+    readingTime: readingTime(document.bodyMarkdown),
+  };
 }
 
 /**
@@ -43,9 +117,7 @@ export async function createPost(
   const intent = String(formData.get("intent") ?? "publish");
 
   const { document, errors } = parseDocument(source);
-  if (!document) {
-    return { errors };
-  }
+  if (!document) return { errors };
 
   const shouldPublish = intent === "publish" || document.published;
   const html = await renderMarkdown(document.bodyMarkdown);
@@ -54,34 +126,15 @@ export async function createPost(
   await prisma.$transaction(async (tx) => {
     const post = await tx.post.create({
       data: {
+        ...derivedFields(document, html),
         userId: session.user.id,
-        title: document.title,
         slug,
-        bodyMarkdown: document.bodyMarkdown,
-        processedHtml: html,
-        processingState: "READY",
-        coverImage: document.coverImage,
-        description: excerpt(document.bodyMarkdown),
-        readingTime: readingTime(document.bodyMarkdown),
         published: shouldPublish,
         publishedAt: shouldPublish ? new Date() : null,
       },
     });
 
-    for (const name of document.tags) {
-      const tag = await tx.tag.upsert({
-        where: { name },
-        create: { name, bgColorHex: randomTagColor() },
-        update: {},
-      });
-      await tx.postTag.create({ data: { postId: post.id, tagId: tag.id } });
-      if (shouldPublish) {
-        await tx.tag.update({
-          where: { id: tag.id },
-          data: { postsCount: { increment: 1 } },
-        });
-      }
-    }
+    await syncTags(tx, post.id, document.tags, false, shouldPublish);
 
     if (shouldPublish) {
       await tx.user.update({
@@ -92,6 +145,114 @@ export async function createPost(
   });
 
   redirect(`/${session.user.username}/${slug}`);
+}
+
+/**
+ * Update an existing post. Used by the edit page and by autosave.
+ *
+ * Slug is immutable once published (PRD §5.2); an unpublished draft still
+ * regenerates its slug from the title so drafts get a sensible URL when they
+ * eventually go live.
+ */
+export async function updatePost(
+  postId: string,
+  source: string,
+  intent: "draft" | "publish" | "autosave",
+): Promise<SaveState> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  const existing = await prisma.post.findUnique({ where: { id: postId } });
+  if (!existing) return { errors: ["Post not found."] };
+  if (existing.userId !== session.user.id) {
+    return { errors: ["You can only edit your own posts."] };
+  }
+
+  const { document, errors } = parseDocument(source);
+  if (!document) return { errors };
+
+  // Autosave never changes publish state; it only persists content.
+  const shouldPublish =
+    intent === "autosave"
+      ? existing.published
+      : intent === "publish" || document.published;
+
+  const html = await renderMarkdown(document.bodyMarkdown);
+  const slug = existing.published
+    ? existing.slug
+    : generateSlug(document.title);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.post.update({
+      where: { id: postId },
+      data: {
+        ...derivedFields(document, html),
+        slug,
+        published: shouldPublish,
+        publishedAt:
+          shouldPublish && !existing.publishedAt
+            ? new Date()
+            : existing.publishedAt,
+      },
+    });
+
+    await syncTags(tx, postId, document.tags, existing.published, shouldPublish);
+
+    // Only move the author's counter when the published state actually flips.
+    if (existing.published !== shouldPublish) {
+      await tx.user.update({
+        where: { id: session.user.id },
+        data: { postsCount: shouldPublish ? { increment: 1 } : { decrement: 1 } },
+      });
+    }
+  });
+
+  if (intent === "autosave") return null;
+  redirect(`/${session.user.username}/${slug}`);
+}
+
+/** Autosave wrapper — persists without navigating. Returns a save timestamp. */
+export async function autosavePost(
+  postId: string,
+  source: string,
+): Promise<{ savedAt: number } | { errors: string[] }> {
+  const result = await updatePost(postId, source, "autosave");
+  if (result?.errors) return { errors: result.errors };
+  return { savedAt: Date.now() };
+}
+
+/**
+ * Create a draft immediately so autosave has a row to write to. Returns the new
+ * post id; the editor swaps into "editing" mode without navigating.
+ */
+export async function createDraft(
+  source: string,
+): Promise<{ id: string } | { errors: string[] }> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (!session.user.username) redirect("/onboarding");
+
+  const { document, errors } = parseDocument(source);
+  if (!document) return { errors };
+
+  const html = await renderMarkdown(document.bodyMarkdown);
+  const slug = generateSlug(document.title);
+
+  const post = await prisma.$transaction(async (tx) => {
+    const created = await tx.post.create({
+      data: {
+        ...derivedFields(document, html),
+        userId: session.user.id,
+        slug,
+        published: false,
+        publishedAt: null,
+      },
+    });
+    await syncTags(tx, created.id, document.tags, false, false);
+    return created;
+  });
+
+  return { id: post.id };
 }
 
 /** Render Markdown for the editor's Preview tab — same pipeline as publish. */

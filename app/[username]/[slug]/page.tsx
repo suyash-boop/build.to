@@ -60,10 +60,20 @@ export default async function PostPage({ params }: PageProps) {
         )}
 
         <div className="p-6 sm:p-10">
-          {!post.published && (
-            <p className="mb-4 inline-block rounded border border-warning px-2 py-1 text-s text-warning">
-              Draft — only you can see this
-            </p>
+          {isAuthor && (
+            <div className="mb-4 flex items-center gap-3">
+              {!post.published && (
+                <span className="rounded border border-warning px-2 py-1 text-s text-warning">
+                  Draft — only you can see this
+                </span>
+              )}
+              <Link
+                href={`/edit/${post.id}`}
+                className="text-s text-secondary underline hover:text-body"
+              >
+                Edit
+              </Link>
+            </div>
           )}
 
           <h1 className="text-3xl font-extrabold leading-tight text-body">
