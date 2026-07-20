@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+/* Dark mode is driven by a data-theme attribute on <html> (PRD §8.3), not the
+   OS media query — so a variant that keys off it lets utilities like
+   `dark:bg-body-bg` work. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+  ─────────────────────────────────────────────────────────────────────────────
+  Design tokens (PRD §8.2–8.5). Every color goes through a semantic token so dark
+  mode is a single attribute flip. Values are sensible dev.to/Crayons-like
+  defaults; verified Storybook values get dialed in during Phase 8 (Polish).
+  ─────────────────────────────────────────────────────────────────────────────
+*/
+:root {
+  /* Color — semantic (§8.3) */
+  --base-bg: #f5f5f5; /* page background */
+  --body-bg: #ffffff; /* card / elevated surface */
+  --body-color: #0a0a0a; /* primary text */
+  --color-secondary: #575757; /* muted text */
+  --border-color: #e2e2e2; /* hairlines */
+  --accent-brand: #3b49df; /* primary action */
+  --accent-brand-hover: #2f3bb3;
+  --accent-success: #0a860a;
+  --accent-danger: #d92d20;
+  --accent-warning: #b54708;
+
+  /* Typography (§8.2) — system stack, no webfont */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* Type scale */
+  --fs-s: 0.8125rem; /* 13px — meta text, timestamps */
+  --fs-base: 1rem; /* 16px — body */
+  --fs-l: 1.125rem; /* 18px — card titles */
+  --fs-xl: 1.5rem; /* 24px — section headings */
+  --fs-2xl: 2rem; /* 32px — post titles */
+  --fs-3xl: 2.5rem; /* 40px — page titles */
+  --lh-body: 1.65; /* generous long-form line-height (§8.2) */
+
+  /* Spacing scale (§8.4) */
+  --su-1: 4px;
+  --su-2: 8px;
+  --su-3: 12px;
+  --su-4: 16px;
+  --su-5: 24px;
+  --su-6: 32px;
+  --su-7: 48px;
+
+  /* Radius (§8.5) */
+  --radius: 4px;
+  --radius-large: 8px;
+}
+
+[data-theme="dark"] {
+  --base-bg: #0a0a0a;
+  --body-bg: #161616;
+  --body-color: #f5f5f5;
+  --color-secondary: #a3a3a3;
+  --border-color: #2a2a2a;
+  --accent-brand: #7986e7;
+  --accent-brand-hover: #97a1ec;
+  --accent-success: #3ccf4e;
+  --accent-danger: #f97066;
+  --accent-warning: #f79009;
+}
+
+/* Map tokens into Tailwind's theme so utilities (bg-body-bg, text-secondary,
+   p-4, rounded, font-sans, text-2xl…) resolve to the tokens above. */
+@theme inline {
+  --color-base-bg: var(--base-bg);
+  --color-body-bg: var(--body-bg);
+  --color-body: var(--body-color);
+  --color-secondary: var(--color-secondary);
+  --color-border: var(--border-color);
+  --color-brand: var(--accent-brand);
+  --color-brand-hover: var(--accent-brand-hover);
+  --color-success: var(--accent-success);
+  --color-danger: var(--accent-danger);
+  --color-warning: var(--accent-warning);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --text-s: var(--fs-s);
+  --text-base: var(--fs-base);
+  --text-l: var(--fs-l);
+  --text-xl: var(--fs-xl);
+  --text-2xl: var(--fs-2xl);
+  --text-3xl: var(--fs-3xl);
+
+  --spacing-1: var(--su-1);
+  --spacing-2: var(--su-2);
+  --spacing-3: var(--su-3);
+  --spacing-4: var(--su-4);
+  --spacing-5: var(--su-5);
+  --spacing-6: var(--su-6);
+  --spacing-7: var(--su-7);
+
+  --radius-DEFAULT: var(--radius);
+  --radius-large: var(--radius-large);
+}
+
+body {
+  background: var(--base-bg);
+  color: var(--body-color);
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+}

@@ -1,0 +1,257 @@
+// build.to schema. Field names follow PRD §4 and are canonical — do not rename.
+//
+// Auth is OAuth-only (Google + GitHub) via BetterAuth, which owns the User,
+// Session, Account, and Verification models below. The application fields on
+// User (§4.1) are added on top of BetterAuth's required fields.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth (BetterAuth-managed) + application User fields (PRD §4.1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id
+  // BetterAuth core fields
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Application fields (PRD §4.1)
+  username        String  @unique // URL slug for profile; reserved-word checked
+  profileImage    String? // avatar URL, not upload
+  profileBgImage  String? // banner image URL; complements brandColor
+  bio             String? // max 200 chars (enforced in app)
+  location        String?
+  websiteUrl      String?
+  work            String?
+  education       String?
+  skills          String? // comma-separated
+  brandColor      String  @default("#000000") // drives profile banner
+  postsCount      Int     @default(0) // denormalized
+
+  // Profile enrichment (dev.to parity) — free text, ≤200 chars enforced in app
+  displayEmailOnProfile Boolean @default(false)
+  pronouns              String? // free text, e.g. "they/them"
+  currentlyLearning     String?
+  availableFor          String?
+  currentlyHackingOn    String?
+
+  // Social links
+  githubUsername    String?
+  twitterUsername   String?
+  mastodonUsername  String?
+  facebookUsername  String?
+  instagramUsername String?
+  youtubeUrl        String?
+  twitchUsername    String?
+
+  // Relations
+  sessions      Session[]
+  accounts      Account[]
+  posts         Post[]
+  comments      Comment[]
+  reactions     Reaction[]
+  follows       Follow[]       @relation("follower")
+  notifications Notification[] @relation("recipient")
+  actedIn       Notification[] @relation("actor")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Content (PRD §4.2–4.5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ProcessingState {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model Post {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  slug            String          @unique
+  bodyMarkdown    String          @db.Text // source of truth for content
+  processedHtml   String?         @db.Text // rendered by worker; null while processing
+  coverImage      String?
+  description     String? // first ~140 chars, for cards and meta tags
+  published       Boolean         @default(false)
+  processingState ProcessingState @default(PENDING)
+  readingTime     Int             @default(1) // minutes; computed on process
+  reactionsCount  Int             @default(0) // denormalized
+  commentsCount   Int             @default(0) // denormalized
+  viewsCount      Int             @default(0) // written back from Redis
+  publishedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tags     PostTag[]
+  comments Comment[]
+
+  @@index([published, publishedAt(sort: Desc)]) // feed query index
+  @@map("post")
+}
+
+model Tag {
+  id         String    @id @default(cuid())
+  name       String    @unique // lowercase, alphanumeric only
+  bgColorHex String // tag chip accent
+  postsCount Int       @default(0) // denormalized
+  posts      PostTag[]
+
+  @@map("tag")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("post_tag")
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  postId        String
+  post          Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId      String? // self-relation; null = top level
+  parent        Comment? @relation("replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       Comment[] @relation("replies")
+  bodyMarkdown  String   @db.Text
+  processedHtml String   @db.Text // comments render synchronously
+  depth         Int      @default(0) // denormalized nesting level, max 3
+  createdAt     DateTime @default(now())
+
+  @@index([postId])
+  @@map("comment")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Social (PRD §4.6–4.8) — polymorphic relations; FK not enforced by Prisma,
+// validate *Type against actual existence in application code.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ReactableType {
+  POST
+  COMMENT
+}
+
+enum ReactionCategory {
+  LIKE
+  UNICORN
+  BOOKMARK
+}
+
+model Reaction {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reactableId   String // Post OR Comment id
+  reactableType ReactableType
+  category      ReactionCategory
+
+  @@unique([userId, reactableId, reactableType, category]) // prevents double-reacting
+  @@index([reactableId, reactableType])
+  @@map("reaction")
+}
+
+enum FollowableType {
+  USER
+  TAG
+}
+
+model Follow {
+  id             String         @id @default(cuid())
+  followerId     String
+  follower       User           @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followableId   String // User OR Tag id
+  followableType FollowableType
+
+  @@unique([followerId, followableId, followableType])
+  @@index([followableId, followableType])
+  @@map("follow")
+}
+
+enum NotificationType {
+  NEW_REACTION
+  NEW_COMMENT
+  NEW_FOLLOWER
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String // recipient
+  user      User             @relation("recipient", fields: [userId], references: [id], onDelete: Cascade)
+  actorId   String // who caused it
+  actor     User             @relation("actor", fields: [actorId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  postId    String?
+  commentId String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+  @@map("notification")
+}
