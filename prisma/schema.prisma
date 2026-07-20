@@ -27,7 +27,10 @@ model User {
   updatedAt     DateTime @updatedAt
 
   // Application fields (PRD §4.1)
-  username        String  @unique // URL slug for profile; reserved-word checked
+  // Nullable because OAuth-only sign-up creates the User before a username is
+  // chosen; /onboarding forces one immediately after. Still @unique — Postgres
+  // permits multiple NULLs — and still effectively required by the app.
+  username        String? @unique // URL slug for profile; reserved-word checked
   profileImage    String? // avatar URL, not upload
   profileBgImage  String? // banner image URL; complements brandColor
   bio             String? // max 200 chars (enforced in app)
