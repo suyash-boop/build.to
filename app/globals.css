@@ -108,3 +108,143 @@ body {
   font-family: var(--font-sans);
   font-size: var(--fs-base);
 }
+
+/*
+  Rendered post content. The Markdown pipeline emits plain HTML with no utility
+  classes, so long-form typography is styled here. Line-height is deliberately
+  generous — long-form readability is the point of the product (PRD §8.2).
+*/
+.post-body {
+  line-height: var(--lh-body);
+  color: var(--body-color);
+}
+.post-body > * + * {
+  margin-top: var(--su-4);
+}
+.post-body h1,
+.post-body h2,
+.post-body h3,
+.post-body h4 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: var(--su-6);
+}
+.post-body h1 {
+  font-size: var(--fs-2xl);
+}
+.post-body h2 {
+  font-size: var(--fs-xl);
+}
+.post-body h3 {
+  font-size: var(--fs-l);
+}
+.post-body a {
+  color: var(--accent-brand);
+  text-decoration: underline;
+}
+.post-body ul,
+.post-body ol {
+  padding-left: var(--su-5);
+}
+.post-body ul {
+  list-style: disc;
+}
+.post-body ol {
+  list-style: decimal;
+}
+.post-body li + li {
+  margin-top: var(--su-1);
+}
+.post-body blockquote {
+  border-left: 3px solid var(--border-color);
+  padding-left: var(--su-4);
+  color: var(--color-secondary);
+}
+.post-body code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+.post-body :not(pre) > code {
+  background: var(--base-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 0.1em 0.35em;
+}
+.post-body pre {
+  background: var(--base-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-large);
+  padding: var(--su-4);
+  overflow-x: auto;
+}
+.post-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+.post-body table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.post-body th,
+.post-body td {
+  border: 1px solid var(--border-color);
+  padding: var(--su-2) var(--su-3);
+  text-align: left;
+}
+.post-body hr {
+  border: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Syntax highlighting (rehype-highlight emits hljs-* classes). */
+.post-body .hljs-keyword,
+.post-body .hljs-selector-tag,
+.post-body .hljs-literal {
+  color: #a626a4;
+}
+.post-body .hljs-string,
+.post-body .hljs-regexp {
+  color: #50a14f;
+}
+.post-body .hljs-number,
+.post-body .hljs-built_in {
+  color: #986801;
+}
+.post-body .hljs-comment,
+.post-body .hljs-quote {
+  color: var(--color-secondary);
+  font-style: italic;
+}
+.post-body .hljs-title,
+.post-body .hljs-function .hljs-title {
+  color: #4078f2;
+}
+.post-body .hljs-attr,
+.post-body .hljs-variable,
+.post-body .hljs-params {
+  color: #e45649;
+}
+
+[data-theme="dark"] .post-body .hljs-keyword,
+[data-theme="dark"] .post-body .hljs-selector-tag,
+[data-theme="dark"] .post-body .hljs-literal {
+  color: #c678dd;
+}
+[data-theme="dark"] .post-body .hljs-string,
+[data-theme="dark"] .post-body .hljs-regexp {
+  color: #98c379;
+}
+[data-theme="dark"] .post-body .hljs-number,
+[data-theme="dark"] .post-body .hljs-built_in {
+  color: #d19a66;
+}
+[data-theme="dark"] .post-body .hljs-title,
+[data-theme="dark"] .post-body .hljs-function .hljs-title {
+  color: #61afef;
+}
+[data-theme="dark"] .post-body .hljs-attr,
+[data-theme="dark"] .post-body .hljs-variable,
+[data-theme="dark"] .post-body .hljs-params {
+  color: #e06c75;
+}
