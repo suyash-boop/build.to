@@ -21,7 +21,7 @@ export async function Header() {
           <Logo />
         </Link>
 
-        <form action="/search" className="hidden max-w-lg flex-1 sm:block">
+        <form action="/search" className="mr-auto hidden w-full max-w-sm sm:block">
           <input
             type="search"
             name="q"
@@ -31,7 +31,7 @@ export async function Header() {
           />
         </form>
 
-        <nav className="flex items-center justify-end gap-2">
+        <nav className="ml-2 flex items-center justify-end gap-2">
           {user ? (
             <>
               <Link href="/new" className={primaryLink}>
