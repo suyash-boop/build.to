@@ -1,25 +1,20 @@
 import { cn } from "@/lib/utils";
 
 /**
- * build.to wordmark: "b." set heavy in a rounded square. In the spirit of
- * dev.to's boxed "DEV" mark but an independent design — black square in light
- * mode, inverts in dark. Uses the brand indigo as the accent dot.
+ * build.to logo mark: "bld.to" set heavy inside a black rounded box (inverts in
+ * dark mode), with the ".to" in the brand indigo. In the spirit of dev.to's
+ * boxed wordmark but an independent design.
  */
 export function Logo({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 select-none",
+        "inline-flex items-center rounded bg-body px-2 py-1 font-mono text-s font-extrabold leading-none tracking-tight text-body-bg select-none",
         className,
       )}
       aria-label="build.to"
     >
-      <span className="flex size-8 items-center justify-center rounded-large bg-body font-mono text-l font-extrabold leading-none tracking-tight text-body-bg">
-        b<span className="text-brand">.</span>
-      </span>
-      <span className="text-l font-extrabold tracking-tight text-body">
-        build<span className="text-brand">.to</span>
-      </span>
+      bld<span className="text-brand">.to</span>
     </span>
   );
 }

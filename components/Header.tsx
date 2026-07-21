@@ -5,7 +5,7 @@ import { UserMenu } from "./UserMenu";
 import { Logo } from "./Logo";
 
 const primaryLink =
-  "inline-flex h-9 items-center justify-center rounded-large bg-brand px-3 text-s font-medium text-white transition-colors hover:bg-brand-hover";
+  "inline-flex h-8 items-center justify-center rounded bg-brand px-3 text-s font-medium text-white transition-colors hover:bg-brand-hover";
 
 // The authenticated shell's top bar (PRD §8.6 — sticky, full-width, bottom
 // border). Renders the user menu when signed in, a log-in link otherwise.
@@ -27,7 +27,7 @@ export async function Header() {
             name="q"
             placeholder="Search"
             aria-label="Search posts"
-            className="h-9 w-full rounded-large border border-border bg-body-bg px-3 text-s text-body placeholder:text-secondary focus-visible:outline-2 focus-visible:outline-brand"
+            className="h-8 w-full rounded border border-border bg-body-bg px-3 text-s text-body placeholder:text-secondary focus-visible:outline-2 focus-visible:outline-brand"
           />
         </form>
 
@@ -40,7 +40,7 @@ export async function Header() {
               <Link
                 href="/notifications"
                 aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
-                className="relative flex size-9 items-center justify-center rounded-large text-secondary transition-colors hover:bg-base-bg hover:text-body"
+                className="relative flex size-8 items-center justify-center rounded text-secondary transition-colors hover:bg-base-bg hover:text-body"
               >
                 <svg
                   aria-hidden
@@ -50,7 +50,7 @@ export async function Header() {
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="size-5"
+                  className="size-4.5"
                 >
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
