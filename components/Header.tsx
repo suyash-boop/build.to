@@ -16,7 +16,7 @@ export async function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-body-bg">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
+      <div className="mx-auto flex h-14 max-w-3xl items-center gap-4 px-4">
         <Link href="/" className="shrink-0">
           <Logo />
         </Link>
@@ -31,7 +31,7 @@ export async function Header() {
           />
         </form>
 
-        <nav className="flex flex-1 items-center justify-end gap-2 sm:flex-none">
+        <nav className="flex items-center justify-end gap-2">
           {user ? (
             <>
               <Link href="/new" className={primaryLink}>
