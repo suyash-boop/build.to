@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { Avatar, Card, Tag } from "@/components/ui";
 import { ProcessingState } from "@/components/post/ProcessingState";
+import { ReactionBar } from "@/components/post/ReactionBar";
+import { FollowButton } from "@/components/FollowButton";
+import { CommentThread } from "@/components/comment/CommentThread";
+import { getReactionState } from "@/app/actions/reactions";
+import { isFollowing } from "@/app/actions/follows";
+import { getCommentTree } from "@/lib/comments";
 import type { Metadata } from "next";
 
 interface PageProps {
@@ -48,6 +54,15 @@ export default async function PostPage({ params }: PageProps) {
 
   const published = post.publishedAt ?? post.createdAt;
 
+  // Social state — only meaningful once the post is public.
+  const [reactionState, followingAuthor, comments] = await Promise.all([
+    getReactionState(post.id),
+    session && !isAuthor
+      ? isFollowing(post.userId, "USER")
+      : Promise.resolve(false),
+    getCommentTree(post.id, session?.user.id),
+  ]);
+
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <Card className="overflow-hidden">
@@ -87,7 +102,7 @@ export default async function PostPage({ params }: PageProps) {
               src={post.user.profileImage ?? post.user.image}
               size="l"
             />
-            <div>
+            <div className="flex-1">
               <Link
                 href={`/${post.user.username}`}
                 className="font-medium text-body hover:text-brand"
@@ -106,6 +121,14 @@ export default async function PostPage({ params }: PageProps) {
                 {post.readingTime} min read
               </p>
             </div>
+            {!isAuthor && post.user.username && (
+              <FollowButton
+                followableId={post.userId}
+                followableType="USER"
+                initialFollowing={followingAuthor}
+                signedIn={reactionState.signedIn}
+              />
+            )}
           </div>
 
           {post.tags.length > 0 && (
@@ -121,6 +144,18 @@ export default async function PostPage({ params }: PageProps) {
             </div>
           )}
 
+          {post.published && (
+            <div className="mt-6 border-y border-border py-2">
+              <ReactionBar
+                postId={post.id}
+                signedIn={reactionState.signedIn}
+                initialCounts={reactionState.counts}
+                initialMine={[...reactionState.mine]}
+                orientation="horizontal"
+              />
+            </div>
+          )}
+
           {post.processingState === "READY" && post.processedHtml ? (
             <div
               className="post-body mt-8"
@@ -129,6 +164,15 @@ export default async function PostPage({ params }: PageProps) {
             />
           ) : (
             <ProcessingState failed={post.processingState === "FAILED"} />
+          )}
+
+          {post.published && (
+            <CommentThread
+              comments={comments}
+              postId={post.id}
+              signedIn={reactionState.signedIn}
+              total={post.commentsCount}
+            />
           )}
         </div>
       </Card>

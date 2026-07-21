@@ -28,12 +28,27 @@ export const connection: ConnectionOptions = {
 
 export const QUEUE_NAMES = {
   processMarkdown: "process-markdown",
+  reconcileCounters: "reconcile-counters",
+  sendNotification: "send-notification",
 } as const;
 
 // ── Job payload types ───────────────────────────────────────────────────────
 
 export interface ProcessMarkdownJob {
   postId: string;
+}
+
+// Repeatable maintenance job — no payload.
+export type ReconcileCountersJob = Record<string, never>;
+
+// IDs only (PRD §6.5). The processor resolves the recipient and skips self-acts.
+export interface SendNotificationJob {
+  type: "NEW_REACTION" | "NEW_COMMENT" | "NEW_FOLLOWER";
+  actorId: string; // who caused it
+  // The subject of the action; which fields are set depends on `type`.
+  postId?: string;
+  commentId?: string;
+  targetUserId?: string; // for NEW_FOLLOWER: the followed user
 }
 
 // ── Default job options ─────────────────────────────────────────────────────
@@ -55,7 +70,30 @@ export const processMarkdownQueue = new Queue<ProcessMarkdownJob>(
   { connection, defaultJobOptions },
 );
 
+export const reconcileCountersQueue = new Queue<ReconcileCountersJob>(
+  QUEUE_NAMES.reconcileCounters,
+  { connection, defaultJobOptions },
+);
+
+export const sendNotificationQueue = new Queue<SendNotificationJob>(
+  QUEUE_NAMES.sendNotification,
+  { connection, defaultJobOptions },
+);
+
+/** Enqueue a notification to be created off the request path (PRD §5.10). */
+export async function enqueueNotification(job: SendNotificationJob) {
+  return sendNotificationQueue.add(QUEUE_NAMES.sendNotification, job);
+}
+
 /** Enqueue a post for background rendering. */
 export async function enqueueProcessMarkdown(postId: string) {
   return processMarkdownQueue.add(QUEUE_NAMES.processMarkdown, { postId });
+}
+
+/** Interval for the repeatable counter-reconciliation job (PRD §6.5). */
+export const RECONCILE_INTERVAL_MS = 10 * 60 * 1000; // every 10 minutes
+
+/** Run a reconciliation pass immediately — used by the live demo. */
+export async function enqueueReconcileNow() {
+  return reconcileCountersQueue.add(QUEUE_NAMES.reconcileCounters, {});
 }

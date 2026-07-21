@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSession } from "@/lib/session";
+import { getUnreadCount } from "@/app/actions/notifications";
 import { UserMenu } from "./UserMenu";
 
 const primaryLink =
@@ -10,6 +11,7 @@ const primaryLink =
 export async function Header() {
   const session = await getSession();
   const user = session?.user;
+  const unread = user ? await getUnreadCount() : 0;
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-body-bg">
@@ -34,6 +36,20 @@ export async function Header() {
             <>
               <Link href="/new" className={primaryLink}>
                 Write a post
+              </Link>
+              <Link
+                href="/notifications"
+                aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
+                className="relative flex size-8 items-center justify-center rounded text-secondary transition-colors hover:bg-base-bg hover:text-body"
+              >
+                <span aria-hidden className="text-l">
+                  🔔
+                </span>
+                {unread > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
               </Link>
               <UserMenu
                 name={user.name}

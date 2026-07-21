@@ -3,7 +3,11 @@ import express from "express";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { ExpressAdapter } from "@bull-board/express";
-import { processMarkdownQueue } from "@/lib/queues";
+import {
+  processMarkdownQueue,
+  reconcileCountersQueue,
+  sendNotificationQueue,
+} from "@/lib/queues";
 
 /**
  * Bull Board — dev-only queue dashboard on its own port (PRD §6.5), used to
@@ -19,7 +23,11 @@ const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath("/");
 
 createBullBoard({
-  queues: [new BullMQAdapter(processMarkdownQueue)],
+  queues: [
+    new BullMQAdapter(processMarkdownQueue),
+    new BullMQAdapter(reconcileCountersQueue),
+    new BullMQAdapter(sendNotificationQueue),
+  ],
   serverAdapter,
 });
 

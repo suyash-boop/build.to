@@ -4,9 +4,15 @@ import { prisma } from "@/lib/prisma";
 import {
   connection,
   QUEUE_NAMES,
+  RECONCILE_INTERVAL_MS,
+  reconcileCountersQueue,
   type ProcessMarkdownJob,
+  type ReconcileCountersJob,
+  type SendNotificationJob,
 } from "@/lib/queues";
 import { processMarkdown } from "./processors/processMarkdown";
+import { reconcileCounters } from "./processors/reconcileCounters";
+import { sendNotification } from "./processors/sendNotification";
 
 /**
  * Worker process (PRD §3.1). This is the ONLY place a BullMQ `Worker` is
@@ -48,13 +54,71 @@ markdownWorker.on("failed", async (job, err) => {
   }
 });
 
+// ── reconcile-counters ──────────────────────────────────────────────────────
+
+const reconcileWorker = new Worker<ReconcileCountersJob>(
+  QUEUE_NAMES.reconcileCounters,
+  reconcileCounters,
+  { connection, concurrency: 1 }, // serial: two passes at once would race
+);
+
+reconcileWorker.on("completed", (job, result) => {
+  if (result.fixes.length > 0) {
+    console.log(
+      `[reconcile-counters] job ${job.id} corrected ${result.fixes.length} counter(s):`,
+    );
+    for (const fix of result.fixes) console.log(`  • ${fix}`);
+  } else {
+    console.log(
+      `[reconcile-counters] job ${job.id}: ${result.checked} records checked, no drift`,
+    );
+  }
+});
+
+reconcileWorker.on("failed", (job, err) => {
+  console.error(`[reconcile-counters] job ${job?.id} failed:`, err.message);
+});
+
+/**
+ * Register the repeatable pass. Upserting by a stable name means restarting the
+ * worker re-uses the same schedule instead of stacking duplicates. Wrapped in a
+ * function rather than a top-level await, which tsx's CJS transform rejects.
+ */
+async function scheduleReconcile() {
+  await reconcileCountersQueue.upsertJobScheduler(
+    "reconcile-counters-every-10m",
+    { every: RECONCILE_INTERVAL_MS },
+    { name: QUEUE_NAMES.reconcileCounters },
+  );
+  console.log(
+    `reconcile-counters scheduled every ${RECONCILE_INTERVAL_MS / 60000} minutes`,
+  );
+}
+void scheduleReconcile();
+
+// ── send-notification ───────────────────────────────────────────────────────
+
+const notificationWorker = new Worker<SendNotificationJob>(
+  QUEUE_NAMES.sendNotification,
+  sendNotification,
+  { connection, concurrency: 5 },
+);
+
+notificationWorker.on("failed", (job, err) => {
+  console.error(`[send-notification] job ${job?.id} failed:`, err.message);
+});
+
 console.log("worker ready — listening on:", Object.values(QUEUE_NAMES).join(", "));
 
 // Drain in-flight jobs before exiting so a restart doesn't leave posts stuck in
 // PROCESSING.
 async function shutdown(signal: string) {
-  console.log(`\n${signal} received — closing worker…`);
-  await markdownWorker.close();
+  console.log(`\n${signal} received — closing workers…`);
+  await Promise.all([
+    markdownWorker.close(),
+    reconcileWorker.close(),
+    notificationWorker.close(),
+  ]);
   await prisma.$disconnect();
   process.exit(0);
 }
