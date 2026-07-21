@@ -13,6 +13,8 @@ const REACTIONS: {
 }[] = [
   { category: "LIKE", emoji: "❤️", label: "Like" },
   { category: "UNICORN", emoji: "🦄", label: "Unicorn" },
+  { category: "FIRE", emoji: "🔥", label: "Fire" },
+  { category: "EXPLODING_HEAD", emoji: "🤯", label: "Mind-blown" },
   { category: "BOOKMARK", emoji: "🔖", label: "Save" },
 ];
 

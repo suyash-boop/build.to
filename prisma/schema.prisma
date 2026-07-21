@@ -209,6 +209,8 @@ enum ReactableType {
 enum ReactionCategory {
   LIKE
   UNICORN
+  FIRE
+  EXPLODING_HEAD
   BOOKMARK
 }
 

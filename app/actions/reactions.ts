@@ -145,15 +145,24 @@ export async function getReactionState(postId: string) {
 
   const byCategory = Object.fromEntries(
     counts.map((c) => [c.category, c._count.category]),
-  ) as Record<ReactionCategory, number | undefined>;
+  ) as Partial<Record<ReactionCategory, number>>;
+
+  // Start every category at 0 so the UI never has to guard for undefined and
+  // adding an enum value doesn't require touching this.
+  const allCategories: ReactionCategory[] = [
+    "LIKE",
+    "UNICORN",
+    "FIRE",
+    "EXPLODING_HEAD",
+    "BOOKMARK",
+  ];
+  const countsRecord = Object.fromEntries(
+    allCategories.map((c) => [c, byCategory[c] ?? 0]),
+  ) as Record<ReactionCategory, number>;
 
   return {
     signedIn: session !== null,
-    counts: {
-      LIKE: byCategory.LIKE ?? 0,
-      UNICORN: byCategory.UNICORN ?? 0,
-      BOOKMARK: byCategory.BOOKMARK ?? 0,
-    },
+    counts: countsRecord,
     mine: new Set(mine.map((r) => r.category)),
   };
 }
