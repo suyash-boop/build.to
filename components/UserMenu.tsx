@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Avatar, Dropdown, DropdownItem } from "@/components/ui";
 
@@ -15,12 +14,17 @@ export interface UserMenuProps {
 }
 
 export function UserMenu({ name, username, image }: UserMenuProps) {
-  const router = useRouter();
-
   async function handleSignOut() {
-    await authClient.signOut();
-    router.push("/");
-    router.refresh();
+    // Redirect in onSuccess with a full navigation so the sign-out completes
+    // even though clicking the item closes (and unmounts) this dropdown. A
+    // router.push here can be aborted by that unmount; window.location cannot.
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          window.location.href = "/";
+        },
+      },
+    });
   }
 
   return (

@@ -13,7 +13,22 @@ if (!redisUrl) {
   throw new Error("REDIS_URL is not set");
 }
 
-export const redis = globalForRedis.redis ?? new Redis(redisUrl);
+function createRedis() {
+  const client = new Redis(redisUrl!, {
+    // Keep retrying instead of throwing if Valkey isn't up yet at boot.
+    retryStrategy: (times) => Math.min(times * 200, 2000),
+    maxRetriesPerRequest: 3,
+  });
+  // An 'error' event with no listener crashes the Node process. Log and let the
+  // retry strategy reconnect instead of taking the web server down when Valkey
+  // blips.
+  client.on("error", (err) => {
+    console.error("[redis] connection error:", err.message);
+  });
+  return client;
+}
+
+export const redis = globalForRedis.redis ?? createRedis();
 
 if (process.env.NODE_ENV !== "production") {
   globalForRedis.redis = redis;
