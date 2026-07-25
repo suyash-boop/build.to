@@ -31,6 +31,30 @@ function StarIcon() {
   );
 }
 
+function ForkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5">
+      <path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 1 1.5 0v.878a2.25 2.25 0 0 1-2.25 2.25h-1.5v2.128a2.251 2.251 0 1 1-1.5 0V8.5h-1.5A2.25 2.25 0 0 1 3.5 6.25v-.878a2.25 2.25 0 1 1 1.5 0ZM5 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm6.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm-3 8.75a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z" />
+    </svg>
+  );
+}
+
+function RepoIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className={className}>
+      <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z" />
+    </svg>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5">
+      <path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.06-1.06l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z" />
+    </svg>
+  );
+}
+
 export interface RepoCardProps {
   repo: GithubRepo;
   /** Selection mode: shows a checkbox affordance and calls onToggle. */
@@ -51,38 +75,51 @@ export function RepoCard({
 
   const inner = (
     <>
+      {/* Language-coloured accent along the top edge. */}
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-1 rounded-t-large"
+        style={{ backgroundColor: langColor ?? "var(--border-color)" }}
+      />
+
       <div className="flex items-start justify-between gap-2">
-        <span className="truncate font-semibold text-body">{repo.name}</span>
-        {selectable && (
+        <div className="flex min-w-0 items-center gap-2">
+          <RepoIcon className="size-4 shrink-0 text-secondary" />
+          <span className="truncate font-semibold text-body group-hover:text-brand">
+            {repo.name}
+          </span>
+        </div>
+
+        {selectable ? (
           <span
             aria-hidden
             className={cn(
-              "flex size-4 shrink-0 items-center justify-center rounded border",
+              "flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors",
               selected
                 ? "border-brand bg-brand text-white"
-                : "border-border",
+                : "border-border text-transparent",
             )}
           >
-            {selected && (
-              <svg viewBox="0 0 16 16" fill="currentColor" className="size-3">
-                <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06L6.75 10.19l5.97-5.97a.75.75 0 0 1 1.06 0Z" />
-              </svg>
-            )}
+            <svg viewBox="0 0 16 16" fill="currentColor" className="size-3">
+              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06L6.75 10.19l5.97-5.97a.75.75 0 0 1 1.06 0Z" />
+            </svg>
+          </span>
+        ) : (
+          <span className="shrink-0 text-secondary opacity-0 transition-opacity group-hover:opacity-100">
+            <ExternalIcon />
           </span>
         )}
       </div>
 
-      {repo.description && (
-        <p className="mt-1 line-clamp-2 text-s text-secondary">
-          {repo.description}
-        </p>
-      )}
+      <p className="mt-2 line-clamp-2 min-h-[2.5em] text-s text-secondary">
+        {repo.description ?? "No description."}
+      </p>
 
       <div className="mt-3 flex items-center gap-4 text-s text-secondary">
         {repo.language && (
           <span className="flex items-center gap-1.5">
             <span
-              className="size-3 rounded-full"
+              className="size-2.5 rounded-full ring-1 ring-inset ring-black/10"
               style={{ backgroundColor: langColor ?? undefined }}
             />
             {repo.language}
@@ -94,12 +131,18 @@ export function RepoCard({
             {repo.stars}
           </span>
         )}
+        {repo.forks > 0 && (
+          <span className="flex items-center gap-1">
+            <ForkIcon />
+            {repo.forks}
+          </span>
+        )}
       </div>
     </>
   );
 
   const base =
-    "block rounded-large border bg-body-bg p-4 text-left transition-colors";
+    "group relative block overflow-hidden rounded-large border bg-body-bg p-4 pt-5 text-left transition-all";
 
   if (selectable) {
     return (
@@ -112,7 +155,7 @@ export function RepoCard({
           "w-full",
           selected
             ? "border-brand ring-1 ring-brand"
-            : "border-border hover:bg-base-bg",
+            : "border-border hover:border-secondary",
         )}
       >
         {inner}
@@ -125,7 +168,10 @@ export function RepoCard({
       href={repo.url}
       target="_blank"
       rel="noopener noreferrer"
-      className={cn(base, "border-border hover:shadow-md")}
+      className={cn(
+        base,
+        "border-border hover:-translate-y-0.5 hover:border-secondary hover:shadow-md",
+      )}
     >
       {inner}
     </a>
