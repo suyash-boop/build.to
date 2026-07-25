@@ -5,10 +5,21 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { isFollowing } from "@/app/actions/follows";
 import { profileLinks } from "@/lib/profile-links";
+import { getProfileStats, getRecentComments } from "@/lib/profile";
 import { Avatar, Card, EmptyState } from "@/components/ui";
 import { PostCard } from "@/components/post/PostCard";
 import { FollowButton } from "@/components/FollowButton";
 import { RepoCard } from "@/components/RepoCard";
+import { SidebarCard } from "@/components/profile/SidebarCard";
+import { RecentComments } from "@/components/profile/RecentComments";
+import {
+  BriefcaseIcon,
+  CalendarIcon,
+  EmailIcon,
+  GradIcon,
+  LinkIcon,
+  LocationIcon,
+} from "@/components/profile/icons";
 import type { GithubRepo } from "@/lib/github";
 
 interface PageProps {
@@ -31,11 +42,17 @@ export async function generateMetadata({
   };
 }
 
-function MetaItem({ label, value }: { label: string; value: string }) {
+function MetaItem({
+  icon,
+  children,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <span className="text-secondary">
-      <span className="sr-only">{label}: </span>
-      {value}
+    <span className="flex items-center gap-1.5 text-secondary">
+      {icon}
+      {children}
     </span>
   );
 }
@@ -48,11 +65,13 @@ export default async function ProfilePage({ params }: PageProps) {
   const session = await getSession();
   const isOwnProfile = session?.user.id === user.id;
 
-  const [following, feed] = await Promise.all([
+  const [following, feed, stats, recentComments] = await Promise.all([
     session && !isOwnProfile
       ? isFollowing(user.id, "USER")
       : Promise.resolve(false),
-    getLatestFeedForUser(user.id),
+    getPostsForUser(user.id),
+    getProfileStats(user.id),
+    getRecentComments(user.id),
   ]);
 
   const links = profileLinks(user);
@@ -64,152 +83,172 @@ export default async function ProfilePage({ params }: PageProps) {
     year: "numeric",
   });
 
+  const enrichment = [
+    { title: "Skills / languages", value: user.skills },
+    { title: "Currently learning", value: user.currentlyLearning },
+    { title: "Currently hacking on", value: user.currentlyHackingOn },
+    { title: "Available for", value: user.availableFor },
+  ].filter((f) => f.value);
+
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-10">
+    <main className="mx-auto max-w-4xl px-4 pb-10">
       {/* Brand-colour banner (PRD §5.5) */}
       <div
-        className="h-28 rounded-b-large sm:h-32"
+        className="h-28 rounded-b-large sm:h-36"
         style={{ backgroundColor: user.brandColor }}
       />
 
-      <Card className="-mt-12 p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <Avatar
-            name={user.name}
-            src={user.profileImage ?? user.image}
-            size="xl"
-            className="-mt-16 border-4 border-body-bg"
-          />
-          <div className="ml-auto">
-            {isOwnProfile ? (
-              <Link
-                href="/settings"
-                className="inline-flex h-8 items-center justify-center rounded border border-border px-3 text-s font-medium text-body transition-colors hover:bg-base-bg"
-              >
-                Edit profile
-              </Link>
-            ) : (
-              <FollowButton
-                followableId={user.id}
-                followableType="USER"
-                initialFollowing={following}
-                signedIn={session !== null}
-              />
-            )}
-          </div>
+      {/* Centered header card */}
+      <Card className="-mt-12 px-6 pb-6 text-center">
+        <div className="flex justify-center">
+          <span className="-mt-14 block size-24 overflow-hidden rounded-full border-4 border-body-bg">
+            <Avatar
+              name={user.name}
+              src={user.profileImage ?? user.image}
+              size="xl"
+              className="size-full"
+            />
+          </span>
+        </div>
+
+        <div className="mt-2 flex justify-center">
+          {isOwnProfile ? (
+            <Link
+              href="/settings"
+              className="inline-flex h-8 items-center justify-center rounded border border-border px-3 text-s font-medium text-body transition-colors hover:bg-base-bg"
+            >
+              Edit profile
+            </Link>
+          ) : (
+            <FollowButton
+              followableId={user.id}
+              followableType="USER"
+              initialFollowing={following}
+              signedIn={session !== null}
+              size="m"
+            />
+          )}
         </div>
 
         <h1 className="mt-3 text-2xl font-bold text-body">{user.name}</h1>
         <p className="text-secondary">@{user.username}</p>
 
-        {user.bio && <p className="mt-3 text-body">{user.bio}</p>}
+        {user.bio && (
+          <p className="mx-auto mt-2 max-w-xl text-body">{user.bio}</p>
+        )}
 
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-s">
-          {user.pronouns && <MetaItem label="Pronouns" value={user.pronouns} />}
-          {user.location && <MetaItem label="Location" value={user.location} />}
-          <MetaItem label="Joined" value={`Joined ${joined}`} />
-          {user.work && <MetaItem label="Work" value={user.work} />}
-          {user.education && (
-            <MetaItem label="Education" value={user.education} />
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-s">
+          {user.pronouns && (
+            <span className="text-secondary">{user.pronouns}</span>
           )}
-        </div>
-
-        {links.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-s">
-            {links.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                className="text-brand hover:underline"
-              >
-                {link.label}
+          {user.location && (
+            <MetaItem icon={<LocationIcon />}>{user.location}</MetaItem>
+          )}
+          <MetaItem icon={<CalendarIcon />}>Joined {joined}</MetaItem>
+          {user.displayEmailOnProfile && (
+            <MetaItem icon={<EmailIcon />}>
+              <a href={`mailto:${user.email}`} className="hover:text-brand">
+                {user.email}
               </a>
-            ))}
-          </div>
-        )}
-
-        {(user.skills ||
-          user.currentlyLearning ||
-          user.availableFor ||
-          user.currentlyHackingOn) && (
-          <dl className="mt-4 grid gap-3 border-t border-border pt-4 text-s sm:grid-cols-2">
-            {user.skills && (
-              <ProfileField label="Skills / languages" value={user.skills} />
-            )}
-            {user.currentlyLearning && (
-              <ProfileField
-                label="Currently learning"
-                value={user.currentlyLearning}
-              />
-            )}
-            {user.availableFor && (
-              <ProfileField label="Available for" value={user.availableFor} />
-            )}
-            {user.currentlyHackingOn && (
-              <ProfileField
-                label="Currently hacking on"
-                value={user.currentlyHackingOn}
-              />
-            )}
-          </dl>
-        )}
-
-        <div className="mt-4 flex gap-4 border-t border-border pt-4 text-s text-secondary">
-          <span>
-            <span className="font-semibold text-body">{user.postsCount}</span>{" "}
-            {user.postsCount === 1 ? "post" : "posts"}
-          </span>
+            </MetaItem>
+          )}
+          {user.work && (
+            <MetaItem icon={<BriefcaseIcon />}>{user.work}</MetaItem>
+          )}
+          {user.education && (
+            <MetaItem icon={<GradIcon />}>{user.education}</MetaItem>
+          )}
+          {links.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="flex items-center gap-1.5 text-brand hover:underline"
+            >
+              <LinkIcon />
+              {link.label}
+            </a>
+          ))}
         </div>
       </Card>
 
-      {showcasedRepos.length > 0 && (
-        <section className="mt-6">
-          <h2 className="mb-3 text-l font-bold">Projects</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {showcasedRepos.map((repo) => (
-              <RepoCard key={repo.id} repo={repo} />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Two-column body: sidebar + main */}
+      <div className="mt-6 grid gap-6 md:grid-cols-[240px_1fr]">
+        <aside className="flex flex-col gap-4">
+          {enrichment.map((f) => (
+            <SidebarCard key={f.title} title={f.title}>
+              {f.value}
+            </SidebarCard>
+          ))}
 
-      <section className="mt-6">
-        {feed.length === 0 ? (
-          <EmptyState
-            title={
-              isOwnProfile ? "You haven't published yet" : "No posts yet"
-            }
-            description={
-              isOwnProfile ? "Write your first post." : undefined
-            }
-          />
-        ) : (
-          <ul className="flex flex-col gap-4">
-            {feed.map((post) => (
-              <li key={post.id}>
-                <PostCard post={post} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          <Card className="p-4">
+            <div className="flex flex-col gap-2 text-s text-secondary">
+              <span>
+                <span className="font-semibold text-body">
+                  {stats.postsCount}
+                </span>{" "}
+                {stats.postsCount === 1 ? "post" : "posts"} published
+              </span>
+              <span>
+                <span className="font-semibold text-body">
+                  {stats.commentsCount}
+                </span>{" "}
+                {stats.commentsCount === 1 ? "comment" : "comments"} written
+              </span>
+              <span>
+                <span className="font-semibold text-body">
+                  {stats.tagsFollowedCount}
+                </span>{" "}
+                {stats.tagsFollowedCount === 1 ? "tag" : "tags"} followed
+              </span>
+            </div>
+          </Card>
+        </aside>
+
+        <div className="flex min-w-0 flex-col gap-8">
+          {showcasedRepos.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-l font-bold">Projects</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {showcasedRepos.map((repo) => (
+                  <RepoCard key={repo.id} repo={repo} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section>
+            {feed.length === 0 ? (
+              <EmptyState
+                title={
+                  isOwnProfile ? "You haven't published yet" : "No posts yet"
+                }
+                description={isOwnProfile ? "Write your first post." : undefined}
+              />
+            ) : (
+              <>
+                <h2 className="mb-3 text-l font-bold">Posts</h2>
+                <ul className="flex flex-col gap-4">
+                  {feed.map((post) => (
+                    <li key={post.id}>
+                      <PostCard post={post} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+
+          <RecentComments comments={recentComments} />
+        </div>
+      </div>
     </main>
   );
 }
 
-function ProfileField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="font-semibold text-body">{label}</dt>
-      <dd className="text-secondary">{value}</dd>
-    </div>
-  );
-}
-
 // A user's published posts, newest first (uses the shared card select).
-async function getLatestFeedForUser(userId: string) {
+async function getPostsForUser(userId: string) {
   const posts = await prisma.post.findMany({
     where: { userId, published: true },
     orderBy: { publishedAt: "desc" },
