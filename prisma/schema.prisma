@@ -42,6 +42,10 @@ model User {
   brandColor      String  @default("#000000") // drives profile banner
   postsCount      Int     @default(0) // denormalized
 
+  // Curated GitHub projects to showcase on the profile. JSON array of
+  // { name, description, url, stars, language } snapshotted at selection time.
+  showcasedRepos  Json? // ShowcasedRepo[] in lib/github.ts
+
   // Profile enrichment (dev.to parity) — free text, ≤200 chars enforced in app
   displayEmailOnProfile Boolean @default(false)
   pronouns              String? // free text, e.g. "they/them"

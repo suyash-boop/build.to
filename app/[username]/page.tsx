@@ -8,6 +8,8 @@ import { profileLinks } from "@/lib/profile-links";
 import { Avatar, Card, EmptyState } from "@/components/ui";
 import { PostCard } from "@/components/post/PostCard";
 import { FollowButton } from "@/components/FollowButton";
+import { RepoCard } from "@/components/RepoCard";
+import type { GithubRepo } from "@/lib/github";
 
 interface PageProps {
   params: Promise<{ username: string }>;
@@ -54,6 +56,9 @@ export default async function ProfilePage({ params }: PageProps) {
   ]);
 
   const links = profileLinks(user);
+  const showcasedRepos: GithubRepo[] = Array.isArray(user.showcasedRepos)
+    ? (user.showcasedRepos as unknown as GithubRepo[])
+    : [];
   const joined = user.createdAt.toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
@@ -158,6 +163,17 @@ export default async function ProfilePage({ params }: PageProps) {
           </span>
         </div>
       </Card>
+
+      {showcasedRepos.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-3 text-l font-bold">Projects</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {showcasedRepos.map((repo) => (
+              <RepoCard key={repo.id} repo={repo} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-6">
         {feed.length === 0 ? (
