@@ -5,7 +5,7 @@ import { UserMenu } from "./UserMenu";
 import { Logo } from "./Logo";
 
 const primaryLink =
-  "inline-flex h-8 items-center justify-center rounded bg-brand px-3 text-s font-medium text-white transition-colors hover:bg-brand-hover";
+  "inline-flex h-7 items-center justify-center rounded bg-brand px-3 text-s font-medium text-white transition-colors hover:bg-brand-hover";
 
 // The authenticated shell's top bar (PRD §8.6 — sticky, full-width, bottom
 // border). Renders the user menu when signed in, a log-in link otherwise.
@@ -16,7 +16,7 @@ export async function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-body-bg">
-      <div className="mx-auto flex h-14 max-w-3xl items-center gap-4 px-4">
+      <div className="mx-auto flex h-16 max-w-3xl items-center gap-4 px-4">
         <Link href="/" className="shrink-0">
           <Logo />
         </Link>

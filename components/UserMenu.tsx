@@ -28,16 +28,32 @@ export function UserMenu({ name, username, image }: UserMenuProps) {
   }
 
   return (
-    <Dropdown trigger={<Avatar name={name} src={image} size="m" />}>
-      <div className="px-3 py-2">
-        <p className="truncate text-base font-medium text-body">{name}</p>
-        {username && (
-          <p className="truncate text-s text-secondary">@{username}</p>
-        )}
-      </div>
+    <Dropdown
+      trigger={
+        <span className="block size-7 overflow-hidden rounded-full">
+          <Avatar name={name} src={image} size="m" className="size-full" />
+        </span>
+      }
+    >
+      {username && (
+        <Link href={`/${username}`} className={menuLink}>
+          <div className="min-w-0">
+            <p className="truncate text-base font-medium text-body">{name}</p>
+            <p className="truncate text-s text-secondary">@{username}</p>
+          </div>
+        </Link>
+      )}
       <div className="my-1 border-t border-border" />
+      {username && (
+        <Link href={`/${username}`} className={menuLink}>
+          Profile
+        </Link>
+      )}
       <Link href="/drafts" className={menuLink}>
         Drafts
+      </Link>
+      <Link href="/settings" className={menuLink}>
+        Settings
       </Link>
       <div className="my-1 border-t border-border" />
       <DropdownItem onClick={handleSignOut}>Sign out</DropdownItem>
