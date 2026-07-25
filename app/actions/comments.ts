@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { renderMarkdown } from "@/lib/markdown";
 import { enqueueNotification } from "@/lib/queues";
+import { invalidate, cacheKeys } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
 import { MAX_DEPTH, TOMBSTONE, type CommentResult } from "@/lib/comment-constants";
 
@@ -86,6 +87,7 @@ export async function addComment(
     commentId: created.id,
   });
 
+  await invalidate(cacheKeys.post(post.slug));
   revalidatePath(`/${post.user.username}/${post.slug}`);
   return { ok: true };
 }
@@ -123,6 +125,7 @@ export async function deleteComment(commentId: string): Promise<CommentResult> {
     data: { bodyMarkdown: TOMBSTONE, processedHtml: `<p>${TOMBSTONE}</p>` },
   });
 
+  await invalidate(cacheKeys.post(comment.post.slug));
   revalidatePath(`/${comment.post.user.username}/${comment.post.slug}`);
   return { ok: true };
 }

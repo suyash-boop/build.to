@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { getPublicPost } from "@/lib/post";
+import { incrementViews } from "@/lib/cache";
 import { getSession } from "@/lib/session";
 import { Avatar, Card, Tag } from "@/components/ui";
 import { ProcessingState } from "@/components/post/ProcessingState";
@@ -16,18 +17,18 @@ interface PageProps {
   params: Promise<{ username: string; slug: string }>;
 }
 
+// Adapts the cached PublicPost to the shape this page renders (Date objects,
+// `user` key). The slug→author check lives inside getPublicPost.
 async function getPost(username: string, slug: string) {
-  const post = await prisma.post.findUnique({
-    where: { slug },
-    include: {
-      user: true,
-      tags: { include: { tag: true } },
-    },
-  });
-  // The slug is unique on its own; verify it really belongs to this author so
-  // /someone-else/their-slug doesn't resolve.
-  if (!post || post.user.username !== username) return null;
-  return post;
+  const post = await getPublicPost(username, slug);
+  if (!post) return null;
+  return {
+    ...post,
+    publishedAt: post.publishedAt ? new Date(post.publishedAt) : null,
+    createdAt: new Date(post.createdAt),
+    user: post.author,
+    tags: post.tags.map((tag) => ({ tag })),
+  };
 }
 
 export async function generateMetadata({
@@ -51,6 +52,12 @@ export default async function PostPage({ params }: PageProps) {
   const session = await getSession();
   const isAuthor = session?.user.id === post.userId;
   if (!post.published && !isAuthor) notFound();
+
+  // Write-behind view count: a cheap Redis INCR, drained to Postgres every 5
+  // min by flush-view-counts. Skip the author's own views and drafts.
+  if (post.published && !isAuthor) {
+    void incrementViews(post.id);
+  }
 
   const published = post.publishedAt ?? post.createdAt;
 

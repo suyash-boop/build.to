@@ -10,8 +10,10 @@ export interface PostCardData {
   readingTime: number;
   reactionsCount: number;
   commentsCount: number;
-  publishedAt: Date | null;
-  createdAt?: Date;
+  // Date | string: a fresh Prisma query yields Date objects, but a
+  // cache-deserialized feed yields ISO strings. PostCard normalizes both.
+  publishedAt: Date | string | null;
+  createdAt?: Date | string;
   author: {
     name: string;
     username: string | null;
@@ -23,7 +25,8 @@ export interface PostCardData {
 /** Feed post card (PRD §5.4) — cover, author, title, tags, counts, reading time. */
 export function PostCard({ post }: { post: PostCardData }) {
   const href = `/${post.author.username}/${post.slug}`;
-  const date = post.publishedAt ?? post.createdAt ?? null;
+  const raw = post.publishedAt ?? post.createdAt ?? null;
+  const date = raw ? new Date(raw) : null;
 
   return (
     <Card hover className="overflow-hidden">

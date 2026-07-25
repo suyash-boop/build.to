@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { cached, cacheKeys, TTL } from "@/lib/cache";
 import type { PostCardData } from "@/components/post/PostCard";
 import type { Prisma } from "@prisma/client";
 
@@ -55,13 +56,24 @@ export interface FeedPage {
 
 /**
  * Latest published posts, newest first (PRD §5.4). Pull-based: generated at read
- * time rather than fanned out on write — see PRD §9.2 for why. Caching lands in
- * Phase 7; this is the uncached baseline to measure against.
+ * time rather than fanned out on write — see PRD §9.2 for why.
+ *
+ * The un-tagged latest feed is cached with a 60s TTL (PRD §6.4): it is public
+ * and identical for every visitor, so one cached page serves everyone. Tag
+ * feeds are not cached under this key — they'd need per-tag keys and see far
+ * less traffic.
  */
 export async function getLatestFeed(
   page = 1,
   tagName?: string,
 ): Promise<FeedPage> {
+  if (!tagName) {
+    return cached(cacheKeys.feedPage(page), TTL.feed, () => queryFeed(page));
+  }
+  return queryFeed(page, tagName);
+}
+
+async function queryFeed(page: number, tagName?: string): Promise<FeedPage> {
   const where: Prisma.PostWhereInput = {
     published: true,
     ...(tagName ? { tags: { some: { tag: { name: tagName } } } } : {}),

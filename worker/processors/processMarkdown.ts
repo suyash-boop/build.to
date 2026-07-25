@@ -1,6 +1,7 @@
 import type { Job } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { excerpt, readingTime, renderMarkdown } from "@/lib/markdown";
+import { invalidate, invalidatePattern, cacheKeys } from "@/lib/cache";
 import type { ProcessMarkdownJob } from "@/lib/queues";
 
 /**
@@ -18,7 +19,7 @@ export async function processMarkdown(job: Job<ProcessMarkdownJob>) {
 
   const post = await prisma.post.findUnique({
     where: { id: postId },
-    select: { id: true, bodyMarkdown: true },
+    select: { id: true, bodyMarkdown: true, slug: true, published: true },
   });
 
   // The post may have been deleted between enqueue and execution. That is not
@@ -43,6 +44,12 @@ export async function processMarkdown(job: Job<ProcessMarkdownJob>) {
       processingState: "READY",
     },
   });
+
+  // Render completion invalidates the cached post (PRD §6.4) — the "still
+  // rendering" snapshot must not outlive the render — and the feed, whose
+  // cards show this post's description/reading time.
+  await invalidate(cacheKeys.post(post.slug));
+  if (post.published) await invalidatePattern(cacheKeys.feedPattern());
 
   return { postId, ok: true };
 }

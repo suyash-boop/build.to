@@ -30,6 +30,7 @@ export const QUEUE_NAMES = {
   processMarkdown: "process-markdown",
   reconcileCounters: "reconcile-counters",
   sendNotification: "send-notification",
+  flushViewCounts: "flush-view-counts",
 } as const;
 
 // ── Job payload types ───────────────────────────────────────────────────────
@@ -38,8 +39,9 @@ export interface ProcessMarkdownJob {
   postId: string;
 }
 
-// Repeatable maintenance job — no payload.
+// Repeatable maintenance jobs — no payload.
 export type ReconcileCountersJob = Record<string, never>;
+export type FlushViewCountsJob = Record<string, never>;
 
 // IDs only (PRD §6.5). The processor resolves the recipient and skips self-acts.
 export interface SendNotificationJob {
@@ -80,6 +82,11 @@ export const sendNotificationQueue = new Queue<SendNotificationJob>(
   { connection, defaultJobOptions },
 );
 
+export const flushViewCountsQueue = new Queue<FlushViewCountsJob>(
+  QUEUE_NAMES.flushViewCounts,
+  { connection, defaultJobOptions },
+);
+
 /** Enqueue a notification to be created off the request path (PRD §5.10). */
 export async function enqueueNotification(job: SendNotificationJob) {
   return sendNotificationQueue.add(QUEUE_NAMES.sendNotification, job);
@@ -92,6 +99,7 @@ export async function enqueueProcessMarkdown(postId: string) {
 
 /** Interval for the repeatable counter-reconciliation job (PRD §6.5). */
 export const RECONCILE_INTERVAL_MS = 10 * 60 * 1000; // every 10 minutes
+export const FLUSH_VIEWS_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes (§6.5)
 
 /** Run a reconciliation pass immediately — used by the live demo. */
 export async function enqueueReconcileNow() {

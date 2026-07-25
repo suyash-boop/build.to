@@ -5,14 +5,18 @@ import {
   connection,
   QUEUE_NAMES,
   RECONCILE_INTERVAL_MS,
+  FLUSH_VIEWS_INTERVAL_MS,
   reconcileCountersQueue,
+  flushViewCountsQueue,
   type ProcessMarkdownJob,
   type ReconcileCountersJob,
   type SendNotificationJob,
+  type FlushViewCountsJob,
 } from "@/lib/queues";
 import { processMarkdown } from "./processors/processMarkdown";
 import { reconcileCounters } from "./processors/reconcileCounters";
 import { sendNotification } from "./processors/sendNotification";
+import { flushViewCounts } from "./processors/flushViewCounts";
 
 /**
  * Worker process (PRD §3.1). This is the ONLY place a BullMQ `Worker` is
@@ -108,6 +112,38 @@ notificationWorker.on("failed", (job, err) => {
   console.error(`[send-notification] job ${job?.id} failed:`, err.message);
 });
 
+// ── flush-view-counts ───────────────────────────────────────────────────────
+
+const flushViewsWorker = new Worker<FlushViewCountsJob>(
+  QUEUE_NAMES.flushViewCounts,
+  flushViewCounts,
+  { connection, concurrency: 1 }, // serial: two flushes at once would race GETDEL
+);
+
+flushViewsWorker.on("completed", (job, result) => {
+  if (result.posts > 0) {
+    console.log(
+      `[flush-view-counts] job ${job.id}: +${result.totalViews} views across ${result.posts} post(s)`,
+    );
+  }
+});
+
+flushViewsWorker.on("failed", (job, err) => {
+  console.error(`[flush-view-counts] job ${job?.id} failed:`, err.message);
+});
+
+async function scheduleFlushViews() {
+  await flushViewCountsQueue.upsertJobScheduler(
+    "flush-view-counts-every-5m",
+    { every: FLUSH_VIEWS_INTERVAL_MS },
+    { name: QUEUE_NAMES.flushViewCounts },
+  );
+  console.log(
+    `flush-view-counts scheduled every ${FLUSH_VIEWS_INTERVAL_MS / 60000} minutes`,
+  );
+}
+void scheduleFlushViews();
+
 console.log("worker ready — listening on:", Object.values(QUEUE_NAMES).join(", "));
 
 // Drain in-flight jobs before exiting so a restart doesn't leave posts stuck in
@@ -118,6 +154,7 @@ async function shutdown(signal: string) {
     markdownWorker.close(),
     reconcileWorker.close(),
     notificationWorker.close(),
+    flushViewsWorker.close(),
   ]);
   await prisma.$disconnect();
   process.exit(0);

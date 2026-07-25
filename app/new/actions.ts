@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { parseDocument, type ParsedDocument } from "@/lib/frontmatter";
 import { excerpt, readingTime, renderMarkdown } from "@/lib/markdown";
 import { enqueueProcessMarkdown } from "@/lib/queues";
+import { invalidate, invalidatePattern, cacheKeys } from "@/lib/cache";
 import { generateSlug } from "@/lib/slug";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
@@ -162,6 +163,9 @@ export async function createPost(
   // picked up before the row is visible to the worker's connection.
   await enqueueProcessMarkdown(created.id);
 
+  // A newly published post changes the feed; drop the cached feed pages.
+  if (shouldPublish) await invalidatePattern(cacheKeys.feedPattern());
+
   // A draft goes back to the editor (where you keep working on it); a published
   // post goes to its public page.
   redirect(
@@ -230,6 +234,12 @@ export async function updatePost(
   });
 
   await enqueueProcessMarkdown(postId);
+
+  // Editing invalidates the post cache; publish state changes affect the feed.
+  await invalidate(cacheKeys.post(slug), cacheKeys.post(existing.slug));
+  if (existing.published || shouldPublish) {
+    await invalidatePattern(cacheKeys.feedPattern());
+  }
 
   if (intent === "autosave") return null;
   redirect(

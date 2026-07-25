@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { enqueueNotification } from "@/lib/queues";
+import { invalidate, cacheKeys } from "@/lib/cache";
 import type { ReactableType, ReactionCategory } from "@prisma/client";
 
 export type ToggleResult =
@@ -99,6 +100,7 @@ export async function toggleReaction(
   });
 
   if (targetPost?.user?.username) {
+    await invalidate(cacheKeys.post(targetPost.slug));
     revalidatePath(`/${targetPost.user.username}/${targetPost.slug}`);
   }
 

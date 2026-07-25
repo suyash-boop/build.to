@@ -7,6 +7,7 @@ import {
   processMarkdownQueue,
   reconcileCountersQueue,
   sendNotificationQueue,
+  flushViewCountsQueue,
 } from "@/lib/queues";
 
 /**
@@ -27,6 +28,7 @@ createBullBoard({
     new BullMQAdapter(processMarkdownQueue),
     new BullMQAdapter(reconcileCountersQueue),
     new BullMQAdapter(sendNotificationQueue),
+    new BullMQAdapter(flushViewCountsQueue),
   ],
   serverAdapter,
 });
