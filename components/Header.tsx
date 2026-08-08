@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { getUnreadCount } from "@/app/actions/notifications";
+import { getTheme } from "@/lib/theme";
 import { UserMenu } from "./UserMenu";
 import { Logo } from "./Logo";
+import { ThemeToggle } from "./ThemeToggle";
 
 const primaryLink =
   "inline-flex h-7 items-center justify-center rounded bg-brand px-3 text-s font-medium text-white transition-colors hover:bg-brand-hover";
@@ -13,10 +15,11 @@ export async function Header() {
   const session = await getSession();
   const user = session?.user;
   const unread = user ? await getUnreadCount() : 0;
+  const theme = await getTheme();
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-body-bg">
-      <div className="mx-auto flex h-16 max-w-3xl items-center gap-4 px-4">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
         <Link href="/" className="shrink-0">
           <Logo />
         </Link>
@@ -32,6 +35,7 @@ export async function Header() {
         </form>
 
         <nav className="ml-2 flex items-center justify-end gap-2">
+          <ThemeToggle initial={theme} />
           {user ? (
             <>
               <Link href="/new" className={primaryLink}>

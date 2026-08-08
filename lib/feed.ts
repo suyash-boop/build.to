@@ -5,6 +5,16 @@ import type { Prisma } from "@prisma/client";
 
 export const POSTS_PER_PAGE = 20; // PRD §5.4
 
+/** Most-used tags, for the feed's right rail. */
+export async function getPopularTags(limit = 10) {
+  return prisma.tag.findMany({
+    where: { postsCount: { gt: 0 } },
+    orderBy: { postsCount: "desc" },
+    take: limit,
+    select: { name: true, bgColorHex: true, postsCount: true },
+  });
+}
+
 // Everything a PostCard needs, and nothing more — the body is deliberately not
 // selected, since feed pages never render it.
 const cardSelect = {
