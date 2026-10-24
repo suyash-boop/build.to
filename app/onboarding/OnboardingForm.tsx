@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { claimUsername, type ClaimUsernameState } from "./actions";
 import { Button, Input } from "@/components/ui";
 
-export function OnboardingForm() {
+export function OnboardingForm({ redirectTo = "/" }: { redirectTo?: string }) {
   const [state, formAction, pending] = useActionState<
     ClaimUsernameState,
     FormData
@@ -12,6 +12,7 @@ export function OnboardingForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
+      <input type="hidden" name="redirect" value={redirectTo} />
       <div className="flex items-center gap-2">
         <span className="text-secondary">build.to/</span>
         <Input

@@ -18,6 +18,7 @@ export const RESERVED_USERNAMES = new Set([
   "notifications",
   "drafts",
   "edit",
+  "projects",
 ]);
 
 // PRD §5.1: ^[a-z0-9_]{3,20}$

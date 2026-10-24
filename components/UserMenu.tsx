@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-html-link-for-pages -- /projects is a separate Next.js zone; hard navigation is required. */
+
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Avatar, Dropdown, DropdownItem } from "@/components/ui";
@@ -21,6 +23,7 @@ export function UserMenu({ name, username, image }: UserMenuProps) {
     await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- this dropdown unmounts on selection; a hard navigation also clears authenticated client caches.
           window.location.href = "/";
         },
       },
@@ -52,6 +55,7 @@ export function UserMenu({ name, username, image }: UserMenuProps) {
       <Link href="/drafts" className={menuLink}>
         Drafts
       </Link>
+      <a href="/projects/home" className={menuLink}>Project workspace</a>
       <Link href="/settings" className={menuLink}>
         Settings
       </Link>

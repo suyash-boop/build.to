@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- /projects is a separate Next.js zone; hard navigation is required. */
 import Link from "next/link";
 
 const links = [
@@ -10,6 +11,10 @@ const links = [
 export function LeftRail() {
   return (
     <nav className="sticky top-20 flex flex-col gap-1 text-base">
+      <a href="/projects/home" className="mb-2 rounded-large border border-border bg-body-bg p-3 transition-colors hover:border-brand">
+        <span className="block font-semibold text-brand">Build together ↗</span>
+        <span className="mt-1 block text-s text-secondary">Projects, tasks, and the people you build with.</span>
+      </a>
       {links.map((l) => (
         <Link
           key={l.href}

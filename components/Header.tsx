@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- /projects is a separate Next.js zone; hard navigation is required. */
 import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { getUnreadCount } from "@/app/actions/notifications";
@@ -19,7 +20,7 @@ export async function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-body-bg">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-4">
         <Link href="/" className="shrink-0">
           <Logo />
         </Link>
@@ -34,12 +35,13 @@ export async function Header() {
           />
         </form>
 
-        <nav className="ml-2 flex items-center justify-end gap-2">
+        <nav className="ml-auto flex shrink-0 items-center justify-end gap-1 sm:ml-2 sm:gap-2">
+          <a href="/projects/home" className="rounded px-2 py-2 text-s font-medium text-secondary hover:bg-base-bg hover:text-brand sm:px-3">Projects</a>
           <ThemeToggle initial={theme} />
           {user ? (
             <>
-              <Link href="/new" className={primaryLink}>
-                Write a post
+              <Link href="/new" className={primaryLink} aria-label="Write a post">
+                Write<span className="hidden sm:inline">&nbsp;a post</span>
               </Link>
               <Link
                 href="/notifications"

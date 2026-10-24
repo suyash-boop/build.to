@@ -1,71 +1,34 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Repository guidance
 
 @AGENTS.md
 
-## What this repo is
+## Current architecture
 
-`build.to` is a dev.to-style social publishing platform being built as an academic learning
-project. **The repo is currently an unmodified `create-next-app` scaffold** — `app/page.tsx`,
-`app/layout.tsx`, and `app/globals.css` still contain boilerplate (Next.js logo, Geist fonts,
-placeholder tokens). None of the product has been built yet.
+This is an implemented product, not a scaffold. **Project A** is the root Next.js
+community/publishing app. **Project B** lives in `project-b/` and supplies the
+Projects workspace. Read `README.md` and `project-b/README.md` before changing it.
+The original PRD is historical: OAuth-only login and the project integration are
+intentional overrides to its initial requirements.
 
-**`PRD.md` is the single source of truth.** Read it before implementing anything. It is written
-to be treated as a specification, not a suggestion:
+- npm workspaces; Node 24. Do not introduce a second lockfile/package manager.
+- A is the public entry (:3000); B UI (:3002) is proxied under `/projects`.
+- B API (:4000) is available at `/projects/api`. Keep A's `/api/auth` separate.
+- BetterAuth in A is the only browser login authority. Never trust a user-id header.
+- All processes share the root DATABASE_URL and physical `user` table.
+- A's root `prisma/` is the only migration authority. Never run B's legacy migrations.
+- Generate the workspace schemas with `npm run db:generate`; do not manually edit
+  `prisma/workspace.prisma` or B's generated `schema.prisma`.
+- Preserve A's text user IDs. B domain entities remain UUIDs.
+- B's `displayName`/`avatarUrl` map to A's `name`/`profileImage`; no duplicate identity.
+- Use full-document anchors between Next.js zones. Internal B links get basePath automatically.
+- Keep private projects out of public profiles/search/caches. Apply authorization in the API.
+- Keep article/workspace comments and notifications distinct; they are different domains.
+- The shared theme cookie is `theme`, with `data-theme` on `<html>`.
+- Keep BullMQ Workers outside Next.js request contexts. Preserve Markdown sanitization.
 
-- **Section 4 (Data Model)** — Prisma field names are canonical. Do not rename them or invent
-  alternatives.
-- **Section 8 (Design System)** — CSS token names are canonical. The current `globals.css` tokens
-  are boilerplate and must be replaced with the Crayons-based tokens in 8.2–8.5.
-- **Section 10 (Build Order)** — build phases in sequence; do not start phase N+1 before phase N
-  works end to end.
-- Decisions marked **[DECIDED]** are settled — do not re-litigate. **[OPEN]** items require asking
-  before implementing.
-- Do not add a dependency not listed in PRD Section 3 without asking first.
+## Checks
 
-## Commands
-
-Package manager is **npm** (see `package-lock.json`).
-
-```bash
-npm run dev      # start Next.js dev server (http://localhost:3000)
-npm run build    # production build
-npm run start    # serve the production build
-npm run lint     # eslint (flat config in eslint.config.mjs)
-```
-
-No test framework is configured yet. Once the two-process architecture (PRD 3.1) lands, `npm run dev`
-is expected to boot both the web app and the `tsx watch worker/index.ts` worker via `concurrently`.
-
-## Architecture (planned — see PRD Sections 3, 6)
-
-The target design is **two Node processes sharing one codebase**: the Next.js web app (enqueues
-jobs only) and a long-lived BullMQ worker (`worker/`) that consumes them. Stack to be installed:
-PostgreSQL + Prisma, Redis, BullMQ, BetterAuth, and a unified/remark/rehype Markdown pipeline.
-
-Non-negotiable constraints from the PRD, worth internalizing before writing code:
-
-- **`rehypeSanitize` is mandatory** in the Markdown pipeline (`lib/markdown.ts`). HTML is stored and
-  rendered with `dangerouslySetInnerHTML`; skipping sanitization is a stored-XSS hole.
-- **Never instantiate a BullMQ `Worker` inside a Next.js route handler, server component, or
-  middleware.** Request contexts are short-lived and orphan the worker's Redis connection. The web
-  app imports `Queue` to add jobs; only `worker/` imports `Worker`.
-- **`lib/markdown.ts` is shared by both the worker and the editor preview route** — preview output
-  must be byte-identical to published output.
-- **Job payloads carry IDs only**, never Prisma objects (payloads are JSON-serialized and objects
-  go stale).
-- **Every color goes through a semantic token** (PRD 8.3). No hardcoded hex in components — that is
-  what breaks dark mode. Dark mode is a `data-theme` attribute on `<html>`, persisted in a cookie.
-- Markdown is **processed on write, not read**; feed is **pull-based, not fan-out**; counters are
-  **denormalized with background reconciliation** (PRD Section 9 — the three decisions to defend).
-
-## Conventions
-
-- TypeScript strict mode is on. No `any` without a comment explaining why.
-- Path alias `@/*` maps to the repo root (`tsconfig.json`).
-- Tailwind CSS v4 (config lives in `globals.css` via `@theme`, not a `tailwind.config.js`;
-  PostCSS uses `@tailwindcss/postcss`).
-- UI copy is sentence case, never Title Case (PRD 8.8).
-- This is **not** the Next.js in your training data (see AGENTS.md) — consult
-  `node_modules/next/dist/docs/` before using framework APIs.
+`npm run lint`, `npm run typecheck`, `npm test`, `npm run test:projects`,
+`npm run build`. For database/auth checks use `npm run test:integration` with
+explicit, isolated TEST_DATABASE_URL and TEST_REDIS_URL. Never truncate user data.
+Do not run destructive upstream test fixtures against the real database.

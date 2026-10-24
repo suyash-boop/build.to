@@ -1,0 +1,362 @@
+@import "tailwindcss";
+
+
+/*
+ * Workspace components use the semantic aliases below. The final token layer
+ * matches Project A's warm surfaces and indigo brand without affecting A's CSS.
+ * Orange is reserved for things that need attention (alerts, overdue, unread); it is never
+ * decoration, never the active nav, never focus. Status hues appear only on small status marks.
+ */
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-subtle: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f5f5f5;
+  --surface-hover: #f2f2f2;
+  --border: #ebebeb;
+  --border-strong: #d4d4d4;
+  --text: #0a0a0a;
+  --text-muted: #525252;
+  --text-faint: #737373;
+  --accent: #e8590c;
+  --accent-soft: #fff1e8;
+  --primary: #0a0a0a;
+  --primary-text: #ffffff;
+  --primary-hover: #262626;
+  --focus: #0a0a0a;
+
+  --st-idea: #737373;
+  --st-building: #2563eb;
+  --st-shipped: #15803d;
+  --st-maintained: #0f766e;
+  --st-paused: #b45309;
+  --st-sunset: #737373;
+
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --warning: #c2410c;
+  --success: #15803d;
+
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.05), 0 12px 32px -8px rgb(0 0 0 / 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #000000;
+    --bg-subtle: #0a0a0a;
+    --surface: #0a0a0a;
+    --surface-2: #141414;
+    --surface-hover: #171717;
+    --border: #1f1f1f;
+    --border-strong: #333333;
+    --text: #fafafa;
+    --text-muted: #a3a3a3;
+    --text-faint: #8a8a8a;
+    --accent: #ff7a1a;
+    --accent-soft: #2a1505;
+    --primary: #fafafa;
+    --primary-text: #000000;
+    --primary-hover: #e5e5e5;
+    --focus: #fafafa;
+
+    --st-idea: #8a8a8a;
+    --st-building: #60a5fa;
+    --st-shipped: #4ade80;
+    --st-maintained: #2dd4bf;
+    --st-paused: #fbbf24;
+    --st-sunset: #8a8a8a;
+
+    --danger: #f87171;
+    --danger-soft: #2a0a0a;
+    --warning: #fb923c;
+    --success: #4ade80;
+
+    --shadow-pop: 0 0 0 1px #262626, 0 16px 40px -8px rgb(0 0 0 / 0.8);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --bg-subtle: #0a0a0a;
+  --surface: #0a0a0a;
+  --surface-2: #141414;
+  --surface-hover: #171717;
+  --border: #1f1f1f;
+  --border-strong: #333333;
+  --text: #fafafa;
+  --text-muted: #a3a3a3;
+  --text-faint: #8a8a8a;
+  --accent: #ff7a1a;
+  --accent-soft: #2a1505;
+  --primary: #fafafa;
+  --primary-text: #000000;
+  --primary-hover: #e5e5e5;
+  --focus: #fafafa;
+
+  --st-idea: #8a8a8a;
+  --st-building: #60a5fa;
+  --st-shipped: #4ade80;
+  --st-maintained: #2dd4bf;
+  --st-paused: #fbbf24;
+  --st-sunset: #8a8a8a;
+
+  --danger: #f87171;
+  --danger-soft: #2a0a0a;
+  --warning: #fb923c;
+  --success: #4ade80;
+
+  --shadow-pop: 0 0 0 1px #262626, 0 16px 40px -8px rgb(0 0 0 / 0.8);
+}
+
+/*
+ * Chart series: validated categorical slots (scripts/validate_palette.js, both modes pass,
+ * CVD ΔE >= 24). Slot 1 blue = completed work; slot 2 orange = scope / secondary.
+ */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --chart-grid: #ebebeb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --chart-grid: #1f1f1f;
+  }
+}
+:root[data-theme="dark"] {
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --chart-grid: #1f1f1f;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-text);
+  --color-primary-hover: var(--primary-hover);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-st-idea: var(--st-idea);
+  --color-st-building: var(--st-building);
+  --color-st-shipped: var(--st-shipped);
+  --color-st-maintained: var(--st-maintained);
+  --color-st-paused: var(--st-paused);
+  --color-st-sunset: var(--st-sunset);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --shadow-pop: var(--shadow-pop);
+
+  /* Type scale: body 14px; labels never below 12px. */
+  --text-2xs: 12px;
+  --text-2xs--line-height: 16px;
+  --text-xs: 12.5px;
+  --text-xs--line-height: 18px;
+  --text-sm: 14px;
+  --text-sm--line-height: 21px;
+  --text-base: 15px;
+  --text-base--line-height: 24px;
+  --text-lg: 18px;
+  --text-lg--line-height: 26px;
+  --text-xl: 22px;
+  --text-xl--line-height: 30px;
+  --text-2xl: 30px;
+  --text-2xl--line-height: 36px;
+}
+
+/* Project A brand, shared across both application zones. Keep the workspace
+   aliases so existing task/insight components retain their semantic styling. */
+:root {
+  --bg: #f7f7f5;
+  --bg-subtle: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f2f2ef;
+  --surface-hover: #eeedf9;
+  --border: rgba(55, 53, 47, 0.10);
+  --border-strong: #d6d4e2;
+  --text: #37352f;
+  --text-muted: #5a5852;
+  --text-faint: #74716b;
+  --primary: #4f46e5;
+  --primary-text: #ffffff;
+  --primary-hover: #4338ca;
+  --focus: #4f46e5;
+  --font-geist-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+:root[data-theme="dark"] {
+  --bg: #111110;
+  --bg-subtle: #111110;
+  --surface: #1a1917;
+  --surface-2: #242320;
+  --surface-hover: #2b2842;
+  --border: rgba(249, 249, 248, 0.12);
+  --border-strong: #49454f;
+  --text: #f9f9f8;
+  --text-muted: #d0cec7;
+  --text-faint: #a7a49d;
+  --primary: #818cf8;
+  --primary-text: #15132a;
+  --primary-hover: #a5b4fc;
+  --focus: #818cf8;
+}
+.workspace-hero {
+  background-image: radial-gradient(ellipse at top right, color-mix(in srgb, var(--primary) 9%, transparent), transparent 65%);
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 21px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--border-strong);
+    color: var(--text);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  /* Tabular figures everywhere numbers are compared. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+/*
+ * Motion is short and functional: overlays settle into place, nothing performs.
+ * Enter: 160-220ms decelerating. Exit: ~120ms accelerating, so dismissals never feel sticky.
+ * Radix keeps closing overlays mounted until their exit animation ends.
+ */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-2px) scale(0.985); }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes slide-out-right {
+  from { transform: none; opacity: 1; }
+  to { transform: translateX(24px); opacity: 0; }
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+@utility animate-overlay {
+  &[data-state="open"] { animation: fade-in 180ms var(--ease-out); }
+  &[data-state="closed"] { animation: fade-out 120ms var(--ease-in) forwards; }
+}
+@utility animate-pop {
+  &[data-state="open"] { animation: pop-in 180ms var(--ease-out); }
+  &[data-state="closed"] { animation: pop-out 110ms var(--ease-in) forwards; }
+}
+@utility animate-sheet {
+  &[data-state="open"] { animation: slide-in-right 240ms var(--ease-out); }
+  &[data-state="closed"] { animation: slide-out-right 150ms var(--ease-in) forwards; }
+}
+@utility animate-page {
+  animation: page-in 200ms var(--ease-out) both;
+}
+/* Interactive surfaces share one transition so hover and press feel uniform everywhere. */
+@utility transition-ui {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 140ms;
+  transition-timing-function: var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Rendered markdown (READMEs, descriptions, release notes). */
+.prose-bldt {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.prose-bldt > * + * { margin-top: 0.85em; }
+.prose-bldt > :first-child { margin-top: 0; }
+.prose-bldt h1, .prose-bldt h2, .prose-bldt h3, .prose-bldt h4 { font-weight: 600; line-height: 1.3; margin-top: 1.6em; }
+.prose-bldt h1 { font-size: 20px; }
+.prose-bldt h2 { font-size: 17px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.prose-bldt h3 { font-size: 15px; }
+.prose-bldt a { color: var(--text); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+.prose-bldt a:hover { text-decoration-color: var(--text); }
+.prose-bldt ul { list-style: disc; padding-left: 1.4em; }
+.prose-bldt ol { list-style: decimal; padding-left: 1.4em; }
+.prose-bldt li + li { margin-top: 0.25em; }
+.prose-bldt code { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+.prose-bldt pre { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; overflow-x: auto; }
+.prose-bldt pre code { background: none; border: 0; padding: 0; }
+.prose-bldt blockquote { border-left: 2px solid var(--border-strong); padding-left: 12px; color: var(--text-muted); }
+.prose-bldt table { width: 100%; border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; }
+.prose-bldt th, .prose-bldt td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.prose-bldt th { background: var(--surface-2); font-weight: 600; }
+.prose-bldt img { max-width: 100%; display: inline-block; }
+.prose-bldt hr { border: 0; border-top: 1px solid var(--border); }
+.prose-bldt input[type="checkbox"] { margin-right: 6px; }

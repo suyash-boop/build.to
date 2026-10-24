@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { invalidatePattern } from "@/lib/cache";
 
 export type SettingsState =
   | { ok: true }
@@ -79,6 +80,7 @@ export async function updateSettings(
     where: { id: session.user.id },
     data,
   });
+  await Promise.all([invalidatePattern("post:*"), invalidatePattern("feed:latest:page:*")]);
 
   revalidatePath("/settings");
   if (session.user.username) {

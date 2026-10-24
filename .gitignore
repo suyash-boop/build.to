@@ -40,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Imported workspace build outputs (source remains tracked).
+project-b/**/node_modules/
+project-b/**/.next/
+project-b/**/dist/
+project-b/packages/db/src/generated/
+project-b/**/*.vsix
+
+# Original import archive; the extracted workspace source is versioned instead.
+/bld.to.zip

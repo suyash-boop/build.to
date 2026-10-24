@@ -8,6 +8,11 @@ import { prisma } from "@/lib/prisma";
 // /onboarding, so it's an optional additional field here (null until then).
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
+  databaseHooks: {
+    user: { create: { after: async (user) => {
+      if (user.image) await prisma.user.update({ where: { id: user.id }, data: { profileImage: user.image } });
+    } } },
+  },
 
   socialProviders: {
     google: {

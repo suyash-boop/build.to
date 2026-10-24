@@ -8,9 +8,11 @@ import { revalidatePath } from "next/cache";
 export async function getUnreadCount(): Promise<number> {
   const session = await getSession();
   if (!session) return 0;
-  return prisma.notification.count({
-    where: { userId: session.user.id, read: false },
-  });
+  const [community, workspace] = await Promise.all([
+    prisma.notification.count({ where: { userId: session.user.id, read: false } }),
+    prisma.projectNotification.count({ where: { recipientId: session.user.id, readAt: null } }),
+  ]);
+  return community + workspace;
 }
 
 /** Mark all of the current user's notifications read (on viewing the page). */

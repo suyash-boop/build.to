@@ -22,6 +22,7 @@ export async function claimUsername(
   if (!session) {
     redirect("/login");
   }
+  if (session.user.username) return { error: "Your username is already set and is shared with your articles and projects." };
 
   const raw = String(formData.get("username") ?? "").trim().toLowerCase();
 
@@ -40,5 +41,6 @@ export async function claimUsername(
     data: { username: raw },
   });
 
-  redirect("/");
+  const candidate = String(formData.get("redirect") ?? "/");
+  redirect(candidate.startsWith("/") && !candidate.startsWith("//") && !/[\\\r\n]/.test(candidate) ? candidate : "/");
 }

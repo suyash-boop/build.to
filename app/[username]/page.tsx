@@ -12,6 +12,7 @@ import { FollowButton } from "@/components/FollowButton";
 import { RepoCard } from "@/components/RepoCard";
 import { SidebarCard } from "@/components/profile/SidebarCard";
 import { RecentComments } from "@/components/profile/RecentComments";
+import { WorkspaceProjects } from "@/components/profile/WorkspaceProjects";
 import {
   BriefcaseIcon,
   CalendarIcon,
@@ -207,6 +208,7 @@ export default async function ProfilePage({ params }: PageProps) {
         </aside>
 
         <div className="flex min-w-0 flex-col gap-8">
+          <WorkspaceProjects userId={user.id} username={username} viewerId={session?.user.id} />
           {showcasedRepos.length > 0 && (
             <section>
               <h2 className="mb-3 text-l font-bold">Projects</h2>

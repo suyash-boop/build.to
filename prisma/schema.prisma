@@ -46,6 +46,37 @@ model User {
   // { name, description, url, stars, language } snapshotted at selection time.
   showcasedRepos  Json? // ShowcasedRepo[] in lib/github.ts
 
+  // Shared Project B identity fields. name/profileImage/username remain the
+  // canonical profile values; the workspace client maps its aliases onto them.
+  headline    String?
+  focusAreas  String[] @default([])
+  openToWork  Boolean @default(false)
+  meetingUrl  String?
+  deletedAt   DateTime?
+
+  githubAccount GithubAccount?
+  workspaceSessions WorkspaceSession[]
+  memberships ProjectMember[]
+  ownedProjects Project[] @relation("ProjectOwner")
+  tasksAssigned Task[] @relation("TaskAssignee")
+  tasksCreated Task[] @relation("TaskCreator")
+  projectComments ProjectComment[]
+  projectNotifications ProjectNotification[] @relation("NotificationRecipient")
+  invitesSent Invitation[] @relation("InvitationInviter")
+  invitesGot Invitation[] @relation("InvitationInvitee")
+  joinRequests JoinRequest[] @relation("JoinRequester")
+  releases Release[]
+  activity ActivityEvent[]
+  contributions Contribution[]
+  auditLogs AuditLog[]
+  webhooks WebhookEndpoint[]
+  workRecords WorkRecord[]
+  deviceAuths DeviceAuthorization[]
+  discussions Discussion[] @relation("DiscussionAuthor")
+  replies DiscussionReply[]
+  replyVotes DiscussionVote[]
+  huddlesHosted Huddle[]
+
   // Profile enrichment (dev.to parity) — free text, ≤200 chars enforced in app
   displayEmailOnProfile Boolean @default(false)
   pronouns              String? // free text, e.g. "they/them"
@@ -73,6 +104,7 @@ model User {
   actedIn       Notification[] @relation("actor")
 
   @@map("user")
+  @@index([deletedAt])
 }
 
 model Session {

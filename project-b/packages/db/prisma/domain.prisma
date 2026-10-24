@@ -1,0 +1,1002 @@
+// Project B domain source. scripts/workspace-schema.mjs generates the mapped
+// compatibility client and Project A's additive workspace models from this file.
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Identity
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  username    String    @unique
+  displayName String
+  email       String?
+  avatarUrl   String?
+  headline    String?
+  bio         String?
+  location    String?
+  websiteUrl  String?
+  /// Lowercased primary areas the user wants to be known for, e.g. "backend", "infra".
+  focusAreas  String[]  @default([])
+  /// Shown on discovery when true.
+  openToWork  Boolean   @default(false)
+  /// Personal meeting room (Meet, Zoom, Whereby...) used when starting a huddle.
+  meetingUrl  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  githubAccount GithubAccount?
+  sessions      Session[]
+  memberships   ProjectMember[]
+  ownedProjects Project[]       @relation("ProjectOwner")
+  tasksAssigned Task[]          @relation("TaskAssignee")
+  tasksCreated  Task[]          @relation("TaskCreator")
+  comments      Comment[]
+  notifications Notification[]  @relation("NotificationRecipient")
+  invitesSent   Invitation[]    @relation("InvitationInviter")
+  invitesGot    Invitation[]    @relation("InvitationInvitee")
+  joinRequests  JoinRequest[]   @relation("JoinRequester")
+  releases      Release[]
+  activity      ActivityEvent[]
+  contributions Contribution[]
+  auditLogs     AuditLog[]
+  webhooks      WebhookEndpoint[]
+  workRecords   WorkRecord[]
+  deviceAuths   DeviceAuthorization[]
+  discussions   Discussion[]         @relation("DiscussionAuthor")
+  replies       DiscussionReply[]
+  replyVotes    DiscussionVote[]
+  huddlesHosted Huddle[]
+
+  @@index([deletedAt])
+}
+
+/// Session tokens are never stored. `id` is the SHA-256 of the cookie token.
+model Session {
+  id         String   @id
+  userId     String   @db.Uuid
+  /// BROWSER sessions use the cookie; DEVICE sessions (editor extensions) send a bearer token.
+  kind       SessionKind @default(BROWSER)
+  /// For devices: what the user approved, e.g. "VS Code on raj-laptop".
+  clientName String?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  userAgent  String?
+  ip         String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model GithubAccount {
+  userId         String    @id @db.Uuid
+  githubUserId   BigInt    @unique
+  login          String
+  /// AES-256-GCM ciphertext (see apps/api/src/lib/crypto.ts).
+  accessToken    String
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([login])
+}
+
+// ─────────────────────────────────────────────────────────────
+// GitHub App installation + repositories
+// ─────────────────────────────────────────────────────────────
+
+model GithubInstallation {
+  id           BigInt    @id
+  accountLogin String
+  accountId    BigInt
+  accountType  String
+  /// "all" or "selected"
+  repoSelection String
+  suspendedAt  DateTime?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  repositories Repository[]
+
+  @@index([accountLogin])
+}
+
+enum SyncStatus {
+  IDLE
+  QUEUED
+  SYNCING
+  FAILED
+}
+
+model Repository {
+  id              String     @id @default(uuid(7)) @db.Uuid
+  githubId        BigInt     @unique
+  installationId  BigInt?
+  ownerLogin      String
+  name            String
+  fullName        String
+  description     String?
+  htmlUrl         String
+  homepageUrl     String?
+  defaultBranch   String     @default("main")
+  isPrivate       Boolean
+  isFork          Boolean    @default(false)
+  isArchived      Boolean    @default(false)
+  primaryLanguage String?
+  /// language -> bytes, as reported by GitHub
+  languages       Json       @default("{}")
+  topics          String[]   @default([])
+  stars           Int        @default(0)
+  pushedAt        DateTime?
+  readme          String?
+  /// [{ slug, evidence }] from manifest detection, merged into project technologies.
+  detectedStack   Json       @default("[]")
+  syncStatus      SyncStatus @default(IDLE)
+  syncError       String?
+  lastSyncedAt    DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  installation GithubInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
+  projects     ProjectRepository[]
+  pullRequests PullRequest[]
+  deployments  Deployment[]
+  contributions Contribution[]
+
+  @@index([installationId])
+  @@index([fullName])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Projects
+// ─────────────────────────────────────────────────────────────
+
+/// Lifecycle only. Who can see a project is `Visibility`, never a stage.
+enum ProjectStage {
+  IDEA
+  BUILDING
+  SHIPPED
+  MAINTAINED
+  PAUSED
+  SUNSET
+}
+
+enum Visibility {
+  PUBLIC
+  /// Anyone with the link; excluded from discovery and search engines.
+  UNLISTED
+  /// Members only.
+  PRIVATE
+}
+
+enum ProjectRole {
+  OWNER
+  MAINTAINER
+  CONTRIBUTOR
+  VIEWER
+}
+
+model Project {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  ownerId     String       @db.Uuid
+  slug        String
+  /// Uppercase prefix for task identifiers, e.g. RELAY -> RELAY-12. Unique per owner.
+  key         String
+  name        String
+  tagline     String?
+  description String?
+  stage       ProjectStage @default(BUILDING)
+  visibility  Visibility   @default(PRIVATE)
+  homepageUrl String?
+  openToContributors Boolean @default(false)
+  /// Roles the team is looking for, free text, e.g. "Frontend", "Design".
+  lookingFor  String[]     @default([])
+  taskCounter Int          @default(0)
+  discussionCounter Int @default(0)
+  /// Per-project overrides for signal detectors: thresholds and disabled types. See packages/core/src/signals.ts.
+  signalSettings Json      @default("{}")
+  shippedAt   DateTime?
+  sunsetAt    DateTime?
+  /// Optional note recorded when a project is sunset or paused.
+  retrospective String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  owner        User                @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members      ProjectMember[]
+  repositories ProjectRepository[]
+  tasks        Task[]
+  milestones   Milestone[]
+  releases     Release[]
+  deployments  Deployment[]
+  activity     ActivityEvent[]
+  invitations  Invitation[]
+  joinRequests JoinRequest[]
+  technologies ProjectTechnology[]
+  comments     Comment[]
+  contributions Contribution[]
+  auditLogs    AuditLog[]
+  brief        ProjectBrief?
+  signals      Signal[]
+  webhooks     WebhookEndpoint[]
+  workRecords  WorkRecord[]
+  discussions  Discussion[]
+  huddles      Huddle[]
+
+  @@unique([ownerId, slug])
+  @@unique([ownerId, key])
+  @@index([visibility, stage, updatedAt])
+  @@index([openToContributors, visibility])
+}
+
+model ProjectMember {
+  projectId String      @db.Uuid
+  userId    String      @db.Uuid
+  role      ProjectRole
+  /// Human title on this project, e.g. "Backend lead".
+  title     String?
+  /// Member controls whether this project appears on their public profile.
+  showOnProfile Boolean @default(true)
+  profileOrder  Int?
+  joinedAt  DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model ProjectRepository {
+  projectId    String   @db.Uuid
+  repositoryId String   @db.Uuid
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, repositoryId])
+  @@index([repositoryId])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED
+  EXPIRED
+}
+
+model Invitation {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  projectId     String           @db.Uuid
+  inviterId     String           @db.Uuid
+  inviteeId     String?          @db.Uuid
+  email         String?
+  role          ProjectRole
+  tokenHash     String           @unique
+  status        InvitationStatus @default(PENDING)
+  expiresAt     DateTime
+  respondedAt   DateTime?
+  createdAt     DateTime         @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inviter User    @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User?   @relation("InvitationInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@index([inviteeId, status])
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  WITHDRAWN
+}
+
+model JoinRequest {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  projectId   String            @db.Uuid
+  userId      String            @db.Uuid
+  message     String
+  roleWanted  String?
+  status      JoinRequestStatus @default(PENDING)
+  decidedById String?           @db.Uuid
+  decidedAt   DateTime?
+  createdAt   DateTime          @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation("JoinRequester", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@index([userId, status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Work
+// ─────────────────────────────────────────────────────────────
+
+enum MilestoneStatus {
+  PLANNED
+  ACTIVE
+  DONE
+  CANCELED
+}
+
+model Milestone {
+  id          String          @id @default(uuid(7)) @db.Uuid
+  projectId   String          @db.Uuid
+  title       String
+  description String?
+  status      MilestoneStatus @default(PLANNED)
+  dueOn       DateTime?       @db.Date
+  completedAt DateTime?
+  position    Float
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@index([projectId, position])
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELED
+}
+
+enum TaskPriority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Task {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  projectId   String       @db.Uuid
+  number      Int
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(NONE)
+  /// Fractional index for manual ordering within a status column.
+  position    Float
+  assigneeId  String?      @db.Uuid
+  creatorId   String       @db.Uuid
+  milestoneId String?      @db.Uuid
+  dueOn       DateTime?    @db.Date
+  startedAt   DateTime?
+  completedAt DateTime?
+  /// Set when the task mirrors a GitHub issue. Title, body, and open/closed follow GitHub.
+  githubIssueId     BigInt?
+  githubIssueNumber Int?
+  githubIssueUrl    String?
+  githubAuthorLogin String?
+  /// Last GitHub state seen (open or closed): only a real closed-to-open change reopens the task.
+  githubIssueState  String?
+  /// GitHub updated_at of the last applied snapshot; older webhook payloads are ignored.
+  githubUpdatedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee     User?         @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator      User          @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  milestone    Milestone?    @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  pullRequests PullRequestTask[]
+
+  @@unique([projectId, number])
+  @@unique([projectId, githubIssueId])
+  @@index([projectId, status, position])
+  @@index([assigneeId, status])
+  @@index([milestoneId])
+}
+
+enum CommentSubject {
+  PROJECT
+  TASK
+  MILESTONE
+  RELEASE
+}
+
+model Comment {
+  id          String         @id @default(uuid(7)) @db.Uuid
+  projectId   String         @db.Uuid
+  subjectType CommentSubject
+  subjectId   String         @db.Uuid
+  authorId    String         @db.Uuid
+  body        String
+  editedAt    DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([subjectType, subjectId, createdAt])
+  @@index([projectId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Code + delivery evidence (mirrored from GitHub)
+// ─────────────────────────────────────────────────────────────
+
+enum PullRequestState {
+  OPEN
+  CLOSED
+  MERGED
+}
+
+model PullRequest {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  githubId       BigInt           @unique
+  repositoryId   String           @db.Uuid
+  number         Int
+  title          String
+  htmlUrl        String
+  state          PullRequestState
+  isDraft        Boolean          @default(false)
+  authorLogin    String
+  authorGithubId BigInt?
+  headRef        String
+  additions      Int              @default(0)
+  deletions      Int              @default(0)
+  changedFiles   Int              @default(0)
+  openedAt       DateTime
+  mergedAt       DateTime?
+  closedAt       DateTime?
+  /// GitHub updated_at of the last applied snapshot; older payloads are ignored.
+  githubUpdatedAt DateTime?
+  updatedAt      DateTime         @updatedAt
+
+  repository Repository        @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  tasks      PullRequestTask[]
+
+  @@unique([repositoryId, number])
+  @@index([authorGithubId])
+}
+
+/// PRs link to tasks when their title, body, or branch mention the task identifier (e.g. RELAY-12).
+model PullRequestTask {
+  pullRequestId String   @db.Uuid
+  taskId        String   @db.Uuid
+  /// True when the PR uses a closing keyword ("fixes RELAY-12"), so merging it completes the task.
+  closes        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  pullRequest PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([pullRequestId, taskId])
+  @@index([taskId])
+}
+
+enum ReleaseSource {
+  MANUAL
+  GITHUB_RELEASE
+  DEPLOYMENT
+}
+
+model Release {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  projectId   String        @db.Uuid
+  version     String?
+  title       String
+  notes       String?
+  url         String?
+  commitSha   String?
+  source      ReleaseSource
+  externalId  String?
+  /// A ship is a release that moves the project into the SHIPPED stage the first time.
+  isShip      Boolean       @default(false)
+  createdById String?       @db.Uuid
+  shippedAt   DateTime
+  createdAt   DateTime      @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, source, externalId])
+  @@index([projectId, shippedAt])
+}
+
+enum DeploymentState {
+  PENDING
+  IN_PROGRESS
+  SUCCESS
+  FAILURE
+  ERROR
+  INACTIVE
+}
+
+model Deployment {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  projectId    String          @db.Uuid
+  repositoryId String          @db.Uuid
+  /// Not globally unique: a repository linked to two projects mirrors the deployment into both.
+  githubId     BigInt
+  environment  String
+  state        DeploymentState
+  url          String?
+  sha          String
+  ref          String
+  creatorLogin String?
+  createdAt    DateTime
+  updatedAt    DateTime
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, githubId])
+  @@index([projectId, environment, createdAt])
+}
+
+/// Per person, per repository, per project rollup derived from GitHub. This is the evidence behind the profile.
+model Contribution {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  projectId      String    @db.Uuid
+  repositoryId   String    @db.Uuid
+  userId         String?   @db.Uuid
+  githubLogin    String
+  githubUserId   BigInt?
+  commits        Int       @default(0)
+  additions      Int       @default(0)
+  deletions      Int       @default(0)
+  prsOpened      Int       @default(0)
+  prsMerged      Int       @default(0)
+  reviews        Int       @default(0)
+  firstAt        DateTime?
+  lastAt         DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user       User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, repositoryId, githubLogin])
+  @@index([userId])
+  @@index([githubUserId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Technologies
+// ─────────────────────────────────────────────────────────────
+
+enum TechCategory {
+  LANGUAGE
+  FRAMEWORK
+  DATABASE
+  INFRASTRUCTURE
+  TOOL
+}
+
+model Technology {
+  id       String       @id @default(uuid(7)) @db.Uuid
+  slug     String       @unique
+  name     String
+  category TechCategory
+  color    String?
+
+  projects ProjectTechnology[]
+}
+
+enum TechSource {
+  DETECTED
+  MANUAL
+}
+
+model ProjectTechnology {
+  projectId    String     @db.Uuid
+  technologyId String     @db.Uuid
+  source       TechSource
+  /// Share of the codebase (0..1) for languages; 0 for detected frameworks.
+  share        Float      @default(0)
+  /// Where detection found it, e.g. "package.json".
+  evidence     String?
+  hidden       Boolean    @default(false)
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  technology Technology @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, technologyId])
+  @@index([technologyId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Activity, notifications, audit, webhooks
+// ─────────────────────────────────────────────────────────────
+
+enum EventSource {
+  BLDT
+  GITHUB
+}
+
+/// How much to trust an evidence item. Surfaced in the UI next to every claim.
+enum TrustLevel {
+  /// Came directly from a connected system (GitHub webhook / API).
+  CONNECTED
+  /// Recorded by bld.t itself (task completed, milestone done).
+  PLATFORM
+  /// Entered manually.
+  SELF_REPORTED
+}
+
+model ActivityEvent {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  projectId   String      @db.Uuid
+  actorId     String?     @db.Uuid
+  actorLogin  String?
+  source      EventSource
+  type        String
+  /// Source-unique id used for idempotent ingestion.
+  externalId  String
+  trust       TrustLevel
+  payload     Json
+  occurredAt  DateTime
+  createdAt   DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, source, externalId])
+  @@index([projectId, occurredAt(sort: Desc)])
+  @@index([actorId, occurredAt(sort: Desc)])
+}
+
+model Notification {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  recipientId String    @db.Uuid
+  type        String
+  projectId   String?   @db.Uuid
+  data        Json
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, readAt, createdAt(sort: Desc)])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  projectId String?  @db.Uuid
+  actorId   String?  @db.Uuid
+  action    String
+  targetId  String?
+  metadata  Json     @default("{}")
+  ip        String?
+  createdAt DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt(sort: Desc)])
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+model WebhookDelivery {
+  /// X-GitHub-Delivery header; makes redelivery idempotent.
+  id          String        @id
+  event       String
+  action      String?
+  installationId BigInt?
+  repositoryGithubId BigInt?
+  status      WebhookStatus @default(RECEIVED)
+  error       String?
+  attempts    Int           @default(0)
+  receivedAt  DateTime      @default(now())
+  processedAt DateTime?
+
+  @@index([repositoryGithubId, receivedAt(sort: Desc)])
+  @@index([status, receivedAt])
+}
+
+/// Latest generated status brief for a project. Members only; regenerated on request.
+model ProjectBrief {
+  projectId     String   @id @db.Uuid
+  /// { summary, recent[], next[], risks[] } with references validated against project data.
+  content       Json
+  model         String
+  generatedById String?  @db.Uuid
+  generatedAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum SignalSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+/// A detected problem in a project (stalled task, PR waiting on review, milestone at risk...).
+/// Opened, updated, and auto-resolved by the signals scan; one row per problem via dedupeKey.
+model Signal {
+  id           String         @id @default(uuid(7)) @db.Uuid
+  projectId    String         @db.Uuid
+  type         String
+  severity     SignalSeverity
+  /// Stable identity of the problem, e.g. "task.stalled:<taskId>". A recurring problem reopens its row.
+  dedupeKey    String
+  title        String
+  data         Json           @default("{}")
+  firstSeenAt  DateTime       @default(now())
+  lastSeenAt   DateTime       @default(now())
+  resolvedAt   DateTime?
+  snoozedUntil DateTime?
+  snoozedById  String?        @db.Uuid
+  notifiedAt   DateTime?
+  /// Severity at the last notification, so an escalation notifies again.
+  notifiedSeverity SignalSeverity?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, dedupeKey])
+  @@index([projectId, resolvedAt])
+  @@index([resolvedAt, severity])
+}
+
+// ── Outbound webhooks ────────────────────────────────────────
+
+enum WebhookFormat {
+  JSON
+  SLACK
+  DISCORD
+}
+
+enum OutboundStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+/// A destination that receives project events. Secrets are AES-GCM encrypted and shown once.
+model WebhookEndpoint {
+  id                  String        @id @default(uuid(7)) @db.Uuid
+  projectId           String        @db.Uuid
+  createdById         String?       @db.Uuid
+  url                 String
+  format              WebhookFormat @default(JSON)
+  description         String?
+  /// Event categories to send; empty means all. See packages/core/src/outbound.ts.
+  events              String[]
+  secretEncrypted     String
+  active              Boolean       @default(true)
+  disabledReason      String?
+  consecutiveFailures Int           @default(0)
+  lastDeliveryAt      DateTime?
+  lastSuccessAt       DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy  User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries OutboundDelivery[]
+
+  @@index([projectId])
+}
+
+/// One event sent to one endpoint, with every attempt's outcome summarized.
+model OutboundDelivery {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  endpointId     String         @db.Uuid
+  /// What produced it: activity:<id>, signal:<id>:<notifiedAt>, ping:<uuid>, redeliver:<uuid>. Unique per endpoint.
+  sourceKey      String
+  event          String
+  /// The envelope, before formatting for Slack or Discord.
+  payload        Json
+  status         OutboundStatus @default(PENDING)
+  attempts       Int            @default(0)
+  nextAttemptAt  DateTime?
+  responseStatus Int?
+  /// First 2 KB of the last response body.
+  responseBody   String?
+  error          String?
+  durationMs     Int?
+  createdAt      DateTime       @default(now())
+  completedAt    DateTime?
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, sourceKey])
+  @@index([endpointId, createdAt(sort: Desc)])
+  @@index([status, nextAttemptAt])
+}
+
+// ── Verifiable work records ──────────────────────────────────
+
+/// A signed statement of one person's work on one project. The canonical JSON is stored byte for
+/// byte as signed, so it outlives later edits to the project (or its deletion).
+model WorkRecord {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  userId        String    @db.Uuid
+  projectId     String?   @db.Uuid
+  /// Signing key id (see packages/core/src/work-records.ts).
+  kid           String
+  /// The exact bytes that were signed: canonical JSON of the record.
+  canonical     String
+  /// Ed25519 signature over canonical, base64url.
+  signature     String
+  periodFrom    DateTime
+  periodTo      DateTime
+  revokedAt     DateTime?
+  revokedReason String?
+  createdAt     DateTime  @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([projectId])
+}
+
+// ── Device sign-in (RFC 8628) ────────────────────────────────
+
+enum SessionKind {
+  BROWSER
+  DEVICE
+}
+
+enum DeviceAuthStatus {
+  PENDING
+  APPROVED
+  DENIED
+  CONSUMED
+}
+
+/// A sign-in started by an editor. The device polls with deviceCode; the person approves userCode in the browser.
+model DeviceAuthorization {
+  /// sha256 of the device code; the code itself is only ever held by the device.
+  id           String           @id
+  /// Short code the person types or confirms, e.g. WDJB-MJHT.
+  userCode     String           @unique
+  clientName   String
+  status       DeviceAuthStatus @default(PENDING)
+  userId       String?          @db.Uuid
+  ip           String?
+  intervalSec  Int              @default(5)
+  lastPolledAt DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime         @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+// ── Discussions ──────────────────────────────────────────────
+
+enum DiscussionCategory {
+  GENERAL
+  HELP
+  IDEAS
+  ANNOUNCEMENTS
+}
+
+/// A project thread. HELP threads may carry the error they are about, captured from the editor.
+model Discussion {
+  id             String             @id @default(uuid(7)) @db.Uuid
+  projectId      String             @db.Uuid
+  number         Int
+  authorId       String             @db.Uuid
+  category       DiscussionCategory @default(GENERAL)
+  title          String
+  body           String
+  /// Error context (HELP). The fingerprint groups the same error across threads; see packages/core/src/error-fingerprint.ts.
+  errorMessage   String?
+  errorFingerprint String?
+  language       String?
+  filePath       String?
+  line           Int?
+  codeSnippet    String?
+  branch         String?
+  commitSha      String?
+  answerId       String?            @unique @db.Uuid
+  solvedAt       DateTime?
+  pinned         Boolean            @default(false)
+  locked         Boolean            @default(false)
+  replyCount     Int                @default(0)
+  lastActivityAt DateTime           @default(now())
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?
+
+  project Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User              @relation("DiscussionAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  answer  DiscussionReply?  @relation("DiscussionAnswer", fields: [answerId], references: [id], onDelete: SetNull)
+  replies DiscussionReply[] @relation("DiscussionReplies")
+
+  @@unique([projectId, number])
+  @@index([projectId, lastActivityAt(sort: Desc)])
+  @@index([projectId, errorFingerprint])
+}
+
+model DiscussionReply {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  discussionId String    @db.Uuid
+  projectId    String    @db.Uuid
+  authorId     String    @db.Uuid
+  body         String
+  editedAt     DateTime?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  discussion Discussion       @relation("DiscussionReplies", fields: [discussionId], references: [id], onDelete: Cascade)
+  author     User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  answerOf   Discussion?      @relation("DiscussionAnswer")
+  votes      DiscussionVote[]
+
+  @@index([discussionId, createdAt])
+}
+
+/// "This helped": one per person per reply.
+model DiscussionVote {
+  replyId   String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  reply DiscussionReply @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([replyId, userId])
+}
+
+// ── Huddles ──────────────────────────────────────────────────
+
+enum HuddleKind {
+  /// A call: a meeting link.
+  HUDDLE
+  /// Live coding: a VS Code Live Share link.
+  PAIR
+}
+
+/// An invitation to talk or pair now. Short-lived; invitees get a notification with the link.
+model Huddle {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  projectId String     @db.Uuid
+  hostId    String     @db.Uuid
+  kind      HuddleKind @default(HUDDLE)
+  url       String
+  topic     String?
+  invitees  String[]   @db.Uuid
+  createdAt DateTime   @default(now())
+  endsAt    DateTime
+  endedAt   DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  host    User    @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+}

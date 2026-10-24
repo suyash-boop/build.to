@@ -9,10 +9,12 @@ export default function LoginPage() {
 
   async function signInWith(provider: "google" | "github") {
     setLoading(provider);
+    const candidate = new URLSearchParams(window.location.search).get("redirect");
+    const next = candidate?.startsWith("/") && !candidate.startsWith("//") && !/[\\\r\n]/.test(candidate) ? candidate : "/";
     // After sign-in, land on /onboarding; it forwards to / once a username exists.
     await authClient.signIn.social({
       provider,
-      callbackURL: "/onboarding",
+      callbackURL: `/onboarding?redirect=${encodeURIComponent(next)}`,
     });
     // signIn.social redirects the browser, so we don't reset loading here.
   }

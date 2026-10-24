@@ -1,0 +1,291 @@
+{
+  "name": "bldt",
+  "displayName": "bld.t",
+  "description": "Your bld.t tasks, team, and discussions inside VS Code. See who is working on what, start a task with a branch, ask the team about an error, and huddle or pair in one click.",
+  "version": "0.1.0",
+  "publisher": "bld-t",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "tasks",
+    "team",
+    "presence",
+    "pair programming",
+    "code review"
+  ],
+  "icon": "media/icon.png",
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onUri"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bldt",
+          "title": "bld.t",
+          "icon": "media/bldt.svg"
+        }
+      ]
+    },
+    "views": {
+      "bldt": [
+        {
+          "id": "bldt.tasks",
+          "name": "My tasks"
+        },
+        {
+          "id": "bldt.team",
+          "name": "Team"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "bldt.tasks",
+        "contents": "Sign in to see your tasks, your team, and what needs you.\n[Sign in to bld.t](command:bldt.signIn)",
+        "when": "!bldt.signedIn"
+      },
+      {
+        "view": "bldt.team",
+        "contents": "Teammates working in their editors show up here.",
+        "when": "bldt.signedIn"
+      }
+    ],
+    "commands": [
+      {
+        "command": "bldt.signIn",
+        "title": "Sign in",
+        "category": "bld.t"
+      },
+      {
+        "command": "bldt.signOut",
+        "title": "Sign out",
+        "category": "bld.t"
+      },
+      {
+        "command": "bldt.refresh",
+        "title": "Refresh",
+        "category": "bld.t",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "bldt.startTask",
+        "title": "Start task",
+        "category": "bld.t",
+        "icon": "$(play)"
+      },
+      {
+        "command": "bldt.taskActions",
+        "title": "Task actions",
+        "category": "bld.t"
+      },
+      {
+        "command": "bldt.currentTask",
+        "title": "Current task",
+        "category": "bld.t"
+      },
+      {
+        "command": "bldt.askTeam",
+        "title": "Ask the team about this error",
+        "category": "bld.t",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "bldt.huddle",
+        "title": "Start a huddle",
+        "category": "bld.t",
+        "icon": "$(device-camera-video)"
+      },
+      {
+        "command": "bldt.pair",
+        "title": "Pair with a teammate (Live Share)",
+        "category": "bld.t",
+        "icon": "$(live-share)"
+      },
+      {
+        "command": "bldt.toggleInvisible",
+        "title": "Toggle invisible",
+        "category": "bld.t",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "bldt.openInBrowser",
+        "title": "Open in browser",
+        "category": "bld.t",
+        "icon": "$(link-external)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "bldt.refresh",
+          "when": "view == bldt.tasks && bldt.signedIn",
+          "group": "navigation"
+        },
+        {
+          "command": "bldt.huddle",
+          "when": "view == bldt.team && bldt.signedIn",
+          "group": "navigation"
+        },
+        {
+          "command": "bldt.toggleInvisible",
+          "when": "view == bldt.team && bldt.signedIn",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "bldt.startTask",
+          "when": "view == bldt.tasks && viewItem == task",
+          "group": "inline"
+        },
+        {
+          "command": "bldt.openInBrowser",
+          "when": "view == bldt.tasks && viewItem == task"
+        },
+        {
+          "command": "bldt.pair",
+          "when": "view == bldt.team && viewItem == person",
+          "group": "inline"
+        },
+        {
+          "command": "bldt.huddle",
+          "when": "view == bldt.team && viewItem == person",
+          "group": "inline"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "bldt.askTeam",
+          "when": "bldt.signedIn",
+          "group": "bldt@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "bldt.taskActions",
+          "when": "false"
+        },
+        {
+          "command": "bldt.openInBrowser",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "bld.t",
+      "properties": {
+        "bldt.url": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Your bld.t address, the one you open bld.t at in your browser. Leave empty and **bld.t: Sign in** asks for it. Must use `https://`; plain `http://` is allowed only for `localhost` and `127.0.0.1`. Changing it signs you out, because a sign-in only works with the address that issued it.",
+          "scope": "application"
+        },
+        "bldt.presence.share": {
+          "type": "string",
+          "enum": [
+            "file",
+            "branch",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Teammates see your project, branch, task, and the file you are in. Enables same-file conflict warnings.",
+            "Teammates see your project, branch, and task, but not files.",
+            "Do not share presence."
+          ],
+          "default": "file",
+          "description": "What your teammates on bld.t can see while you work.",
+          "scope": "application"
+        },
+        "bldt.notifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show bld.t notifications (huddle invites, replies, alerts) as VS Code notifications.",
+          "scope": "application"
+        }
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "bldt.start",
+        "title": "Get started with bld.t",
+        "description": "Your tasks, your team, and help with errors, without leaving VS Code.",
+        "steps": [
+          {
+            "id": "signin",
+            "title": "Sign in",
+            "description": "Connect this editor to your bld.t account. Your browser opens; approve there.\n[Sign in](command:bldt.signIn)",
+            "media": {
+              "markdown": "media/walkthrough/signin.md"
+            },
+            "completionEvents": [
+              "onContext:bldt.signedIn"
+            ]
+          },
+          {
+            "id": "tasks",
+            "title": "Start a task",
+            "description": "Open the bld.t view and pick a task. Start creates a branch named after it, so your pull request links itself.\n[Open My tasks](command:bldt.tasks.focus)",
+            "media": {
+              "markdown": "media/walkthrough/tasks.md"
+            },
+            "completionEvents": [
+              "onCommand:bldt.startTask"
+            ]
+          },
+          {
+            "id": "ask",
+            "title": "Ask the team about an error",
+            "description": "On any red squiggle, open the lightbulb and choose Ask the team. If your team fixed it before, you see the fix right away.",
+            "media": {
+              "markdown": "media/walkthrough/ask.md"
+            },
+            "completionEvents": [
+              "onCommand:bldt.askTeam"
+            ]
+          },
+          {
+            "id": "team",
+            "title": "Work together",
+            "description": "See who is working on what. Start a huddle or pair with Live Share from the Team view.\n[Open Team](command:bldt.team.focus)",
+            "media": {
+              "markdown": "media/walkthrough/team.md"
+            },
+            "completionEvents": [
+              "onView:bldt.team"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs --production",
+    "dev": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "package": "node esbuild.mjs --production && vsce package --no-dependencies --skip-license --out bldt.vsix && node publish-local.mjs",
+    "publish:marketplace": "node esbuild.mjs --production && vsce publish --no-dependencies --skip-license",
+    "publish:openvsx": "node esbuild.mjs --production && vsce package --no-dependencies --skip-license --out bldt.vsix && npx --yes ovsx@0.10.1 publish bldt.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "~1.95.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.28.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  }
+}

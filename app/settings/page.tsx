@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- /projects is a separate Next.js zone and needs hard navigation. */
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
@@ -50,6 +51,7 @@ export default async function SettingsPage() {
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-6">
       <h1 className="text-xl font-bold">Settings</h1>
+      <a href="/projects/settings" className="rounded-large border border-border bg-body-bg p-4 text-s text-secondary transition-colors hover:border-brand"><span className="font-semibold text-brand">Project workspace settings ↗</span><span className="mt-1 block">Your profile is shared. Manage repository connections, editor access, and build history in the workspace.</span></a>
       <SettingsForm values={values} />
       <GithubShowcase
         hasGithubUsername={!!user.githubUsername}

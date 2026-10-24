@@ -1,0 +1,10 @@
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+const target = process.env.TEST_DATABASE_URL;
+if (!target) throw new Error("Set TEST_DATABASE_URL explicitly. There is no default test database.");
+const url = new URL(target);
+if (!["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || !url.pathname.includes("_test")) throw new Error("Refusing to migrate a non-local or non-test database.");
+const root = fileURLToPath(new URL("../", import.meta.url));
+const result = spawnSync(process.execPath, [path.join(root, "node_modules/prisma/build/index.js"), "migrate", "deploy"], { cwd: root, env: { ...process.env, DATABASE_URL: target }, stdio: "inherit" });
+process.exit(result.status ?? 1);

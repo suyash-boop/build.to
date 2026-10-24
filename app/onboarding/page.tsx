@@ -3,14 +3,16 @@ import { redirect } from "next/navigation";
 import { OnboardingForm } from "./OnboardingForm";
 import { Card } from "@/components/ui";
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ redirect?: string }> }) {
+  const { redirect: candidate } = await searchParams;
+  const next = candidate?.startsWith("/") && !candidate.startsWith("//") && !/[\\\r\n]/.test(candidate) ? candidate : "/";
   const session = await getSession();
   if (!session) {
     redirect("/login");
   }
   // Already onboarded — nothing to do here.
   if (session.user.username) {
-    redirect("/");
+    redirect(next);
   }
 
   return (
@@ -22,7 +24,7 @@ export default async function OnboardingPage() {
           change it after publishing, so pick well.
         </p>
         <div className="mt-6">
-          <OnboardingForm />
+          <OnboardingForm redirectTo={next} />
         </div>
       </Card>
     </main>

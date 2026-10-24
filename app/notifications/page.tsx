@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- /projects is a separate Next.js zone; the multi-zones guide requires anchors between zones. */
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -48,6 +49,7 @@ export default async function NotificationsPage() {
       actor: { select: { name: true, username: true, profileImage: true, image: true } },
     },
   });
+  const workspaceUnread = await prisma.projectNotification.count({ where: { recipientId: session.user.id, readAt: null } });
 
   // Resolve the post slugs referenced by post-related notifications in one query.
   const postIds = [
@@ -65,6 +67,7 @@ export default async function NotificationsPage() {
     <main className="mx-auto max-w-2xl px-4 py-6">
       <MarkReadOnView />
       <h1 className="mb-4 text-xl font-bold">Notifications</h1>
+      <a href="/projects/inbox" className="mb-5 flex items-center justify-between rounded-large border border-border bg-body-bg p-4 text-s hover:border-brand"><span>Project invitations, discussions, and updates ↗</span>{workspaceUnread > 0 && <span className="rounded-full bg-brand px-2 py-1 text-white">{workspaceUnread} unread</span>}</a>
 
       {notifications.length === 0 ? (
         <EmptyState

@@ -1,0 +1,12 @@
+src/**
+test/**
+node_modules/**
+.turbo/**
+esbuild.mjs
+tsconfig.json
+vitest.config.ts
+.gitignore
+*.vsix
+**/*.map
+publish-local.mjs
+media/walkthrough/*.png
